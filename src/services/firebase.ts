@@ -3,12 +3,12 @@ import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'dummy',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'dummy',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'dummy',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'dummy',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || 'dummy',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || 'dummy',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'YOUR_FIREBASE_API_KEY',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'your-project.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'your-project-id',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'your-project.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || 'your-sender-id',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || 'your-app-id',
 };
 
 const app = initializeApp(firebaseConfig);

@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileImage, Loader2, AlertCircle, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { UploadCloud, X, CheckCircle2, ChevronRight, AlertCircle, ImageIcon } from 'lucide-react';
 import { uploadImage } from '../services/cloudinary';
 import { predictSkinDisease } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -9,217 +9,260 @@ import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
+const processingSteps = [
+  'Uploading image to Cloudinary…',
+  'Running CNN classifier…',
+  'Generating UNet segmentation mask…',
+  'Preparing your results…',
+];
+
 export const Dashboard: React.FC = () => {
   const { user, isGuest } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [stepIdx, setStepIdx] = useState(0);
   const [result, setResult] = useState<any | null>(null);
   const [hasScanned, setHasScanned] = useState(false);
+  const [confidenceDisplay, setConfidenceDisplay] = useState(0);
 
   useEffect(() => {
-    if (isGuest) {
-      const scanned = localStorage.getItem('guest_scanned');
-      if (scanned === 'true') {
-        setHasScanned(true);
-      }
-    }
+    if (isGuest && localStorage.getItem('guest_scanned') === 'true') setHasScanned(true);
   }, [isGuest]);
 
-  const analyzeSelectedFile = useCallback(async (selectedFile: File) => {
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setStepIdx(i => Math.min(i + 1, processingSteps.length - 1));
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  useEffect(() => {
+    if (result) {
+      const target = result.confidence;
+      let cur = 0;
+      const step = target / 40;
+      const iv = setInterval(() => {
+        cur += step;
+        if (cur >= target) { setConfidenceDisplay(target); clearInterval(iv); }
+        else setConfidenceDisplay(Math.round(cur));
+      }, 25);
+      return () => clearInterval(iv);
+    }
+  }, [result]);
+
+  const analyzeFile = useCallback(async (selectedFile: File) => {
     if (isGuest && hasScanned) {
-      toast.error('Guest limit reached. Please create an account to continue.');
+      toast.error('Guest limit reached. Create a free account to scan more.');
       return;
     }
-
     setLoading(true);
     setResult(null);
-
+    setStepIdx(0);
     try {
       const imageUrl = await uploadImage(selectedFile);
       const prediction = await predictSkinDisease({ imageUrl });
-
       setResult(prediction);
-
-      if (isGuest) {
-        localStorage.setItem('guest_scanned', 'true');
-        setHasScanned(true);
-      }
-
+      if (isGuest) { localStorage.setItem('guest_scanned', 'true'); setHasScanned(true); }
       if (user) {
         await addDoc(collection(db, 'scans'), {
           userId: user.uid,
           imageUrl,
           disease: prediction.disease,
           confidence: prediction.confidence,
+          description: prediction.description,
           createdAt: serverTimestamp(),
         });
       }
-
       toast.success('Analysis complete!');
     } catch (error: any) {
-      toast.error(error.message || 'Analysis failed. Try again later.');
-    } finally {
-      setLoading(false);
-    }
+      toast.error(error.message || 'Analysis failed. Please try again.');
+    } finally { setLoading(false); }
   }, [hasScanned, isGuest, user]);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      const selectedFile = acceptedFiles[0];
-      setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
-      void analyzeSelectedFile(selectedFile);
-    }
-  }, [analyzeSelectedFile]);
+  const onDrop = useCallback((files: File[]) => {
+    if (!files.length) return;
+    const f = files[0];
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+    setResult(null);
+    void analyzeFile(f);
+  }, [analyzeFile]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { 'image/*': [] },
-    maxFiles: 1,
+    onDrop, accept: { 'image/*': [] }, maxFiles: 1,
   });
 
-  const reset = () => {
-    setFile(null);
-    setPreview(null);
-    setResult(null);
-    setLoading(false);
-  };
+  const reset = () => { setFile(null); setPreview(null); setResult(null); setLoading(false); setStepIdx(0); };
+
+  const firstName = user?.displayName?.split(' ')[0] || (isGuest ? 'Guest' : 'there');
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Skin Condition Analysis</h1>
-        <p className="text-gray-600 dark:text-gray-400">Upload a clear image of the affected skin area and the scan will start automatically.</p>
-        {isGuest && <p className="text-orange-500 font-medium text-sm">Guest Mode: You have {hasScanned ? '0' : '1'} scan remaining.</p>}
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 md:p-8">
-        <AnimatePresence mode="wait">
-          {!file ? (
-            <motion.div key="dropzone" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
-                  isDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                }`}
-              >
-                <input {...getInputProps()} />
-                <UploadCloud className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
-                <p className="text-lg font-medium text-gray-700 dark:text-gray-200">
-                  {isDragActive ? 'Drop the image here...' : 'Drag & drop an image here, or click to select'}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Supports JPG, PNG, WEBP</p>
+      <div className="max-w-4xl mx-auto space-y-6 pb-8">
+        {/* Greeting */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+          <h1 className="text-3xl font-extrabold" style={{ color: 'var(--tx)' }}>
+            Hello, <span style={{ color: 'var(--accent)' }}>{firstName}</span> 👋
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--tx2)' }}>Upload a skin photo below to start your AI analysis.</p>
+          {isGuest && (
+              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                   style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <AlertCircle size={13} />
+                Guest mode · {hasScanned ? '0' : '1'} scan remaining
               </div>
-            </motion.div>
-          ) : (
-            <motion.div key="preview" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                <div className="w-full md:w-1/2">
-                  <div className="relative rounded-xl overflow-hidden shadow-md aspect-square bg-gray-100 dark:bg-gray-900">
-                    <img src={preview!} alt="Preview" className="w-full h-full object-cover" />
-                    {!result && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); reset(); }}
-                        className="absolute top-2 right-2 bg-red-500/80 text-white p-2 rounded-full hover:bg-red-600 transition-colors backdrop-blur-sm"
-                        aria-label="Remove image"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+          )}
+        </motion.div>
 
-                <div className="w-full md:w-1/2 space-y-6">
-                  {!result ? (
-                    <div className="h-full flex flex-col justify-center space-y-4">
-                      <div className="flex items-center space-x-3 text-gray-700 dark:text-gray-300">
-                        <FileImage className="w-5 h-5 text-blue-500" />
-                        <span className="font-medium truncate">{file.name}</span>
-                      </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {loading
-                          ? 'Uploading and analyzing the image now. Results will appear automatically.'
-                          : 'The image is ready. The scan starts automatically after upload.'}
-                      </p>
-                      <div className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg font-medium transition-all flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/30">
-                        {loading ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            <span>Scanning image...</span>
-                          </>
-                        ) : (
-                          <span>Preparing results...</span>
+        {/* Main scan card */}
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+          <AnimatePresence mode="wait">
+            {/* Drop zone */}
+            {!file && (
+                <motion.div key="drop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="p-6 sm:p-8">
+                  <div {...getRootProps()} className="rounded-2xl p-12 text-center cursor-pointer transition-all duration-200"
+                       style={{
+                         border: `2px dashed ${isDragActive ? 'var(--accent)' : 'var(--br2)'}`,
+                         background: isDragActive ? 'var(--accent-dim)' : 'var(--surface2)',
+                       }}>
+                    <input {...getInputProps()} />
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-colors"
+                         style={{ background: isDragActive ? 'var(--accent)' : 'var(--accent-dim)', color: isDragActive ? '#fff' : 'var(--accent)' }}>
+                      <UploadCloud size={28} />
+                    </div>
+                    <p className="text-lg font-bold mb-1" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                      {isDragActive ? 'Drop it here' : 'Upload a skin photo'}
+                    </p>
+                    <p className="text-sm" style={{ color: 'var(--tx2)' }}>Drag & drop or click to select · JPG, PNG, WEBP</p>
+                    <p className="text-xs mt-3" style={{ color: 'var(--tx3)' }}>For best results: close-up, well-lit, focused on the affected area</p>
+                  </div>
+                </motion.div>
+            )}
+
+            {/* Preview + results */}
+            {file && (
+                <motion.div key="preview" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-6 sm:p-8">
+                  <div className="flex flex-col md:flex-row gap-6 items-start">
+                    {/* Image */}
+                    <div className="w-full md:w-2/5 flex-shrink-0">
+                      <div className="relative rounded-2xl overflow-hidden aspect-square"
+                           style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                        <img src={preview!} alt="Skin scan" className="w-full h-full object-cover" />
+                        {!result && (
+                            <button onClick={(e) => { e.stopPropagation(); reset(); }}
+                                    className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs"
+                                    style={{ background: 'rgba(239,68,68,0.85)' }}>
+                              <X size={13} />
+                            </button>
+                        )}
+                        {/* Scanning overlay */}
+                        {loading && (
+                            <div className="absolute inset-0 flex items-center justify-center"
+                                 style={{ background: 'rgba(8,15,13,0.55)', backdropFilter: 'blur(2px)' }}>
+                              <div className="pring w-16 h-16 rounded-full border-2" style={{ borderColor: 'rgba(0,212,170,0.6)' }} />
+                            </div>
                         )}
                       </div>
-                      {isGuest && hasScanned && (
-                        <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 rounded-lg text-sm flex items-start space-x-2">
-                          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                          <span>You've used your guest scan. Please sign up to scan more images and save your history.</span>
-                        </div>
-                      )}
+                      <p className="text-xs mt-2 truncate text-center" style={{ color: 'var(--tx3)' }}>
+                        <ImageIcon size={11} className="inline mr-1" />{file.name}
+                      </p>
                     </div>
-                  ) : (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-5 border border-gray-100 dark:border-gray-700 h-full"
-                    >
-                      <div className="flex items-center space-x-2 mb-4">
-                        <CheckCircle2 className="w-6 h-6 text-green-500" />
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Analysis Result</h3>
-                      </div>
 
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Detected Condition</p>
-                          <p className="text-lg font-semibold text-gray-900 dark:text-white">{result.disease}</p>
-                        </div>
+                    {/* Right panel */}
+                    <div className="flex-1 min-w-0">
+                      <AnimatePresence mode="wait">
+                        {/* Loading state */}
+                        {loading && (
+                            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+                              <p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>Analyzing your image…</p>
+                              <div className="space-y-2">
+                                {processingSteps.map((s, i) => (
+                                    <div key={s} className="flex items-center gap-3 py-2 px-3 rounded-xl transition-all"
+                                         style={{ background: i === stepIdx ? 'var(--accent-dim)' : 'transparent' }}>
+                                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                                           style={{
+                                             background: i < stepIdx ? 'var(--accent)' : i === stepIdx ? 'var(--accent-dim)' : 'var(--br)',
+                                             color: i < stepIdx ? '#fff' : i === stepIdx ? 'var(--accent)' : 'var(--tx3)',
+                                           }}>
+                                        {i < stepIdx ? <CheckCircle2 size={12} /> :
+                                            i === stepIdx ? <span className="spin w-2.5 h-2.5 border-2 rounded-full block" style={{ borderColor: 'var(--br2)', borderTopColor: 'var(--accent)' }} /> :
+                                                <span className="w-1.5 h-1.5 rounded-full block" style={{ background: 'var(--tx3)' }} />}
+                                      </div>
+                                      <span className="text-xs font-medium" style={{ color: i === stepIdx ? 'var(--accent)' : i < stepIdx ? 'var(--tx2)' : 'var(--tx3)' }}>{s}</span>
+                                    </div>
+                                ))}
+                              </div>
+                            </motion.div>
+                        )}
 
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Confidence Score</p>
-                          <div className="flex items-center space-x-3">
-                            <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${result.confidence}%` }}></div>
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{result.confidence.toFixed(1)}%</span>
-                          </div>
-                        </div>
+                        {/* Result */}
+                        {result && !loading && (
+                            <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle2 size={18} style={{ color: 'var(--accent)' }} />
+                                <h3 className="text-lg font-extrabold" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Analysis Result</h3>
+                              </div>
 
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Description</p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{result.description}</p>
-                        </div>
+                              {/* Disease */}
+                              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--tx3)' }}>Detected condition</p>
+                                <p className="text-xl font-extrabold" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{result.disease}</p>
+                              </div>
 
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-2">Suggestions</p>
-                          <ul className="space-y-1">
-                            {result.suggestions.map((suggestion: string, i: number) => (
-                              <li key={i} className="flex items-start text-sm text-gray-700 dark:text-gray-300">
-                                <ChevronRight className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                                <span>{suggestion}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
+                              {/* Confidence */}
+                              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--tx3)' }}>Confidence score</p>
+                                  <span className="text-lg font-extrabold" style={{ color: 'var(--accent)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{confidenceDisplay}%</span>
+                                </div>
+                                <div className="confidence-track">
+                                  <div className="confidence-fill" style={{ width: `${confidenceDisplay}%` }} />
+                                </div>
+                              </div>
 
-                      <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
-                        <button
-                          onClick={reset}
-                          className="w-full py-2.5 px-4 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          Scan Another Image
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                              {/* Description */}
+                              {result.description && (
+                                  <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                    <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--tx3)' }}>Description</p>
+                                    <p className="text-sm leading-relaxed" style={{ color: 'var(--tx2)' }}>{result.description}</p>
+                                  </div>
+                              )}
+
+                              {/* Suggestions */}
+                              {result.suggestions?.length > 0 && (
+                                  <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                    <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--tx3)' }}>Recommendations</p>
+                                    <ul className="space-y-1.5">
+                                      {result.suggestions.map((s: string, i: number) => (
+                                          <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'var(--tx2)' }}>
+                                            <ChevronRight size={14} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+                                            {s}
+                                          </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                              )}
+
+                              <button onClick={reset}
+                                      className="btn-ghost w-full py-2.5 rounded-xl text-sm mt-2">
+                                ↩ Scan another image
+                              </button>
+                            </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Disclaimer */}
+        <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--tx3)' }}>
+          ⚠ Results are for informational purposes only and are not a medical diagnosis.
+          Consult a qualified dermatologist for any concerning skin changes.
+        </p>
       </div>
-    </div>
   );
 };

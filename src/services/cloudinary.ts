@@ -2,13 +2,8 @@ export const uploadImage = async (file: File): Promise<string> => {
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
-  // Since we don't have actual keys configured, we will mock the upload process if keys are missing or invalid
-  if (!cloudName || cloudName === 'demo' || !uploadPreset || uploadPreset === 'dummy_preset') {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(URL.createObjectURL(file)); // Mock URL for local testing
-      }, 1000);
-    });
+  if (!cloudName || !uploadPreset) {
+    throw new Error('Cloudinary credentials not configured. Please set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in .env');
   }
 
   const formData = new FormData();

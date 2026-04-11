@@ -11,22 +11,9 @@ interface PredictionResponse {
 
 export const predictSkinDisease = async (request: PredictionRequest): Promise<PredictionResponse> => {
   const url = import.meta.env.VITE_FLASK_URL;
-  if (!url || url === 'http://localhost:5000') {
-    // Mock the response if there is no backend configured
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          disease: 'Melanoma (Malignant)',
-          confidence: 94.5,
-          description: 'A type of skin cancer that develops from the pigment-producing cells known as melanocytes.',
-          suggestions: [
-            'Consult a dermatologist immediately for a proper diagnosis.',
-            'Avoid excessive sun exposure.',
-            'Keep track of any changes in moles.'
-          ]
-        });
-      }, 2000);
-    });
+
+  if (!url) {
+    throw new Error('Flask backend URL not configured. Please set VITE_FLASK_URL in .env');
   }
 
   const res = await fetch(`${url}/api/predict`, {
