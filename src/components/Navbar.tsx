@@ -6,7 +6,7 @@ import { Moon, Sun, LogOut, Menu, X, Scan, History, BarChart2 } from 'lucide-rea
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Navbar: React.FC = () => {
-  const { user, isGuest, logout } = useAuth();
+  const { user, userProfile, isGuest, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,7 +28,7 @@ export const Navbar: React.FC = () => {
     { name: 'Reports', path: '/reports',   icon: BarChart2 },
   ];
   const isActive = (p: string) => location.pathname === p;
-  const firstName = user?.displayName?.split(' ')[0] || (isGuest ? 'Guest' : '');
+  const firstName = userProfile?.firstName || user?.displayName?.split(' ')[0] || (isGuest ? 'Guest' : '');
 
   const navBg = scrolled
       ? (theme === 'dark' ? 'rgba(7,13,26,0.92)' : 'rgba(246,248,252,0.92)')

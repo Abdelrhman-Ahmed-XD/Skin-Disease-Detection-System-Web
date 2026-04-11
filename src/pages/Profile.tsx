@@ -1,78 +1,82 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { collection, query, where, getCountFromServer } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Check, X, LogOut, Mail, Calendar, Scan, ShieldCheck } from 'lucide-react';
+import { Edit2, Check, X, LogOut, Mail, Calendar, Scan, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 export const Profile: React.FC = () => {
-  const { user, isGuest, logout } = useAuth();
+  const { user, userProfile, isGuest, logout, refreshProfile } = useAuth();
   const navigate = useNavigate();
+
   const [editingName, setEditingName] = useState(false);
-  const [name, setName] = useState('');
-  const [draftName, setDraftName] = useState('');
-  const [scanCount, setScanCount] = useState(0);
-  const [joinDate, setJoinDate] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [draftFirst, setDraftFirst] = useState('');
+  const [draftLast, setDraftLast]   = useState('');
+  const [scanCount, setScanCount]   = useState(0);
   const [savingName, setSavingName] = useState(false);
+  const [countLoading, setCountLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      if (!user) { setLoading(false); return; }
+    if (userProfile) {
+      setDraftFirst(userProfile.firstName);
+      setDraftLast(userProfile.lastName);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    const loadCount = async () => {
+      if (!user) { setCountLoading(false); return; }
       try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          const n = data.name || user.displayName || 'User';
-          setName(n);
-          setDraftName(n);
-          if (data.createdAt) {
-            setJoinDate(new Date(data.createdAt.toDate()).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-          }
-        }
         const cq = query(collection(db, 'scans'), where('userId', '==', user.uid));
-        const snap2 = await getCountFromServer(cq);
-        setScanCount(snap2.data().count);
+        const snap = await getCountFromServer(cq);
+        setScanCount(snap.data().count);
       } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      finally { setCountLoading(false); }
     };
-    load();
+    loadCount();
   }, [user]);
 
   const saveName = async () => {
-    if (!draftName.trim()) { toast.error('Name cannot be empty'); return; }
+    if (!draftFirst.trim()) { toast.error('First name cannot be empty'); return; }
     setSavingName(true);
     try {
-      await updateDoc(doc(db, 'users', user!.uid), { name: draftName.trim() });
-      if (auth.currentUser) await updateProfile(auth.currentUser, { displayName: draftName.trim() });
-      setName(draftName.trim());
+      const fullName = `${draftFirst.trim()} ${draftLast.trim()}`.trim();
+      await updateDoc(doc(db, 'users', user!.uid), {
+        firstName: draftFirst.trim(),
+        lastName: draftLast.trim(),
+        updatedAt: new Date().toISOString(),
+      });
+      if (auth.currentUser) await updateProfile(auth.currentUser, { displayName: fullName });
+      await refreshProfile();
       setEditingName(false);
       toast.success('Name updated!');
     } catch { toast.error('Failed to update name'); }
     finally { setSavingName(false); }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
+  const handleLogout = async () => { await logout(); navigate('/'); };
 
-  const initials = name ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() : (isGuest ? 'G' : 'U');
-  const providers = user?.providerData.map(p => p.providerId) || [];
+  // Format join date from ISO string (mobile app stores it as string)
+  const joinDate = (() => {
+    const raw = userProfile?.createdAt || user?.metadata.creationTime;
+    if (!raw) return '—';
+    try { return new Date(raw).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+    catch { return '—'; }
+  })();
 
-  const providerLabel = (id: string) => {
-    if (id === 'google.com') return 'Google';
-    if (id === 'facebook.com') return 'Facebook';
-    if (id === 'password') return 'Email';
-    return id;
-  };
+  const fullName   = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
+  const initials   = userProfile
+      ? `${userProfile.firstName[0] || ''}${userProfile.lastName[0] || ''}`.toUpperCase()
+      : (isGuest ? 'G' : 'U');
+  const providers  = user?.providerData.map(p => p.providerId) || [];
+  const providerLabel = (id: string) =>
+      id === 'google.com' ? 'Google' : id === 'facebook.com' ? 'Facebook' : id === 'password' ? 'Email' : id;
 
-  if (loading) return (
+  if (!userProfile && !isGuest) return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="spin w-8 h-8 border-2 rounded-full" style={{ borderColor: 'var(--br2)', borderTopColor: 'var(--accent)' }} />
       </div>
@@ -99,38 +103,58 @@ export const Profile: React.FC = () => {
           {/* Avatar + name card */}
           <div className="rounded-2xl p-7 space-y-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
             <div className="flex items-start gap-5">
-              {/* Avatar */}
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-extrabold text-white flex-shrink-0"
-                   style={{ background: 'var(--accent)', boxShadow: '0 8px 24px var(--accent-glow)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-                {initials}
-              </div>
+
+              {/* Avatar — shows photo from Cloudinary if available */}
+              {userProfile?.photoUri ? (
+                  <img
+                      src={userProfile.photoUri}
+                      alt={fullName}
+                      className="w-20 h-20 rounded-2xl object-cover flex-shrink-0"
+                      style={{ boxShadow: '0 8px 24px var(--accent-glow)', border: '2px solid var(--accent)' }}
+                  />
+              ) : (
+                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-extrabold text-white flex-shrink-0"
+                       style={{ background: 'var(--accent)', boxShadow: '0 8px 24px var(--accent-glow)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                    {initials}
+                  </div>
+              )}
+
               {/* Name */}
               <div className="flex-1 min-w-0">
                 {editingName ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                          type="text" value={draftName} onChange={e => setDraftName(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
-                          className="flex-1 px-3 py-2 rounded-xl text-lg font-bold outline-none"
-                          style={{ background: 'var(--surface2)', border: '1.5px solid var(--accent)', color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                          autoFocus
-                      />
-                      <button onClick={saveName} disabled={savingName}
-                              className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-                              style={{ background: 'var(--accent)', color: '#fff' }}>
-                        {savingName ? <span className="spin w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" /> : <Check size={16} />}
-                      </button>
-                      <button onClick={() => { setEditingName(false); setDraftName(name); }}
-                              className="w-9 h-9 rounded-xl flex items-center justify-center"
-                              style={{ background: 'var(--accent-dim)', color: 'var(--tx2)' }}>
-                        <X size={16} />
-                      </button>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                            type="text" value={draftFirst} onChange={e => setDraftFirst(e.target.value)}
+                            placeholder="First name"
+                            className="flex-1 px-3 py-2 rounded-xl text-base font-bold outline-none"
+                            style={{ background: 'var(--surface2)', border: '1.5px solid var(--accent)', color: 'var(--tx)' }}
+                            autoFocus
+                        />
+                        <input
+                            type="text" value={draftLast} onChange={e => setDraftLast(e.target.value)}
+                            placeholder="Last name"
+                            className="flex-1 px-3 py-2 rounded-xl text-base font-bold outline-none"
+                            style={{ background: 'var(--surface2)', border: '1.5px solid var(--accent)', color: 'var(--tx)' }}
+                            onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
+                        />
+                        <button onClick={saveName} disabled={savingName}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style={{ background: 'var(--accent)', color: '#fff' }}>
+                          {savingName ? <span className="spin w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" /> : <Check size={16} />}
+                        </button>
+                        <button onClick={() => { setEditingName(false); setDraftFirst(userProfile?.firstName || ''); setDraftLast(userProfile?.lastName || ''); }}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style={{ background: 'var(--accent-dim)', color: 'var(--tx2)' }}>
+                          <X size={16} />
+                        </button>
+                      </div>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2">
-                      <h1 className="text-xl font-extrabold truncate" style={{ color: 'var(--tx)' }}>{name}</h1>
+                      <h1 className="text-xl font-extrabold truncate" style={{ color: 'var(--tx)' }}>{fullName || 'No name set'}</h1>
                       <button onClick={() => setEditingName(true)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors flex-shrink-0"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                               style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
                         <Edit2 size={13} />
                       </button>
@@ -150,13 +174,13 @@ export const Profile: React.FC = () => {
               </div>
             </div>
 
-            {/* Stats */}
+            {/* Stats grid */}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { icon: Scan, label: 'Total scans', value: scanCount },
-                { icon: Calendar, label: 'Member since', value: joinDate || '—' },
-                { icon: Mail, label: 'Email', value: user?.email || '—' },
-                { icon: ShieldCheck, label: 'Account status', value: user?.emailVerified ? 'Verified' : 'Active' },
+                { icon: Scan,       label: 'Total scans',    value: countLoading ? '…' : scanCount },
+                { icon: Calendar,   label: 'Member since',   value: joinDate },
+                { icon: Mail,       label: 'Email',          value: user?.email || '—' },
+                { icon: ShieldCheck,label: 'Account status', value: userProfile?.isEmailVerified ? 'Verified' : 'Active' },
               ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
                     <div className="flex items-center gap-2 mb-1">
@@ -167,6 +191,32 @@ export const Profile: React.FC = () => {
                   </div>
               ))}
             </div>
+
+            {/* Extra profile info from mobile app data */}
+            {(userProfile?.gender || userProfile?.birthYear) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {userProfile?.gender && (
+                      <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <UserIcon size={14} style={{ color: 'var(--accent)' }} />
+                          <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Gender</span>
+                        </div>
+                        <p className="text-sm font-semibold capitalize" style={{ color: 'var(--tx)' }}>{userProfile.gender}</p>
+                      </div>
+                  )}
+                  {userProfile?.birthYear && (
+                      <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Calendar size={14} style={{ color: 'var(--accent)' }} />
+                          <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Date of birth</span>
+                        </div>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>
+                          {userProfile.birthDay}/{userProfile.birthMonth}/{userProfile.birthYear}
+                        </p>
+                      </div>
+                  )}
+                </div>
+            )}
           </div>
 
           {/* Sign out */}

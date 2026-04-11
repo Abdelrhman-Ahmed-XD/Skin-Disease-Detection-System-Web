@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { Mail, Lock, User as UserIcon, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -27,7 +27,20 @@ export const Signup: React.FC = () => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: name });
-      await setDoc(doc(db, 'users', cred.user.uid), { name, email, createdAt: serverTimestamp() });
+      const nameParts = name.trim().split(' ');
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        firstName: nameParts[0] || '',
+        lastName: nameParts.slice(1).join(' ') || '',
+        email,
+        photoUri: '',
+        gender: '',
+        skinColor: '',
+        darkMode: true,
+        isEmailVerified: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
       toast.success('Account created! Welcome to SkinSight 🎉');
       navigate('/dashboard');
     } catch (error: any) {
