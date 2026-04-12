@@ -1,84 +1,266 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { doc, updateDoc, collection, query, where, getCountFromServer } from 'firebase/firestore';
-import { updateProfile } from 'firebase/auth';
+import { doc, updateDoc, collection, query, getCountFromServer } from 'firebase/firestore';
+import { updateProfile, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Check, X, LogOut, Mail, Calendar, Scan, ShieldCheck, User as UserIcon } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Check, LogOut, Mail, Calendar, Scan, ShieldCheck,
+  User as UserIcon, Camera, Loader2, Lock, Eye, EyeOff,
+  ChevronRight, Info, AlertTriangle, CheckCircle2,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
+// ── Cloudinary upload ────────────────────────────────────────────────────────
+const uploadToCloudinary = async (file: File): Promise<string> => {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+  fd.append('folder', 'skinsight_profiles');
+  const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: fd }
+  );
+  if (!res.ok) throw new Error('Upload failed');
+  return (await res.json()).secure_url;
+};
+
+// ── Colour pickers data ──────────────────────────────────────────────────────
+const SKIN_COLORS = [
+  { label: 'Very Light', color: '#F5E0D3' }, { label: 'Light',      color: '#EACAA7' },
+  { label: 'Medium',     color: '#D1A67A' }, { label: 'Tan',        color: '#B57D50' },
+  { label: 'Brown',      color: '#A05C38' }, { label: 'Dark Brown', color: '#8B4513' },
+  { label: 'Deep',       color: '#7A3E11' }, { label: 'Ebony',      color: '#603311' },
+];
+const EYE_COLORS = [
+  { name: 'Black',       color: '#1a1a1a' }, { name: 'Brown',       color: '#7B4B1A' },
+  { name: 'Light Blue',  color: '#6EB6FF' }, { name: 'Light Green', color: '#6EDB8F' },
+  { name: 'Grey',        color: '#9AA0A6' },
+];
+const HAIR_COLORS = [
+  { name: 'Black',  color: '#1a1a1a' }, { name: 'Brown',    color: '#7B4B1A' },
+  { name: 'Blonde', color: '#D4A853' }, { name: 'Red',      color: '#C0392B' },
+  { name: 'Grey',   color: '#9AA0A6' },
+];
+
+// ── Password strength checker ────────────────────────────────────────────────
+const pwChecks = (pw: string) => [
+  { label: 'At least 8 characters',  pass: pw.length >= 8 },
+  { label: 'Uppercase letter',        pass: /[A-Z]/.test(pw) },
+  { label: 'Lowercase letter',        pass: /[a-z]/.test(pw) },
+  { label: 'A number',                pass: /[0-9]/.test(pw) },
+  { label: 'Special character',       pass: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw) },
+];
+const isPwValid = (pw: string) => pwChecks(pw).every(c => c.pass);
+
+// ── Tooltip component ────────────────────────────────────────────────────────
+const Tip: React.FC<{ text: string }> = ({ text }) => {
+  const [show, setShow] = useState(false);
+  return (
+      <div className="relative inline-flex">
+        <button
+            onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
+            onClick={() => setShow(v => !v)}
+            className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+          <Info size={9} />
+        </button>
+        <AnimatePresence>
+          {show && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-52 px-3 py-2 rounded-xl text-xs leading-relaxed pointer-events-none"
+                          style={{ background: 'var(--surface)', border: '1px solid var(--br)', color: 'var(--tx2)',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                {text}
+              </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+  );
+};
+
+// ── Colour swatch row ────────────────────────────────────────────────────────
+const ColorRow: React.FC<{
+  options: { color: string; name?: string; label?: string }[];
+  selected: string;
+  onChange: (c: string) => void;
+}> = ({ options, selected, onChange }) => (
+    <div className="flex flex-wrap gap-2 mt-2">
+      {options.map(o => {
+        const val = o.color;
+        const isSelected = selected === val;
+        return (
+            <button key={val} onClick={() => onChange(val)} title={o.name ?? o.label}
+                    className="w-8 h-8 rounded-full transition-transform hover:scale-110 relative flex-shrink-0"
+                    style={{ background: val, border: isSelected ? '2.5px solid var(--accent)' : '2px solid rgba(255,255,255,0.15)',
+                      boxShadow: isSelected ? '0 0 0 3px rgba(0,229,255,0.25)' : 'none' }}>
+              {isSelected && (
+                  <span className="absolute inset-0 flex items-center justify-center">
+              <Check size={12} color={parseInt(val.slice(1), 16) > 0x888888 ? '#000' : '#fff'} />
+            </span>
+              )}
+            </button>
+        );
+      })}
+    </div>
+);
+
+// ── Tab type ─────────────────────────────────────────────────────────────────
+type Tab = 'profile' | 'edit' | 'password';
+
+// ── Main Profile page ─────────────────────────────────────────────────────────
 export const Profile: React.FC = () => {
   const { user, userProfile, isGuest, logout, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<Tab>('profile');
 
-  const [editingName, setEditingName] = useState(false);
-  const [draftFirst, setDraftFirst] = useState('');
-  const [draftLast, setDraftLast]   = useState('');
-  const [scanCount, setScanCount]   = useState(0);
-  const [savingName, setSavingName] = useState(false);
+  // ── Profile view state ──
+  const [scanCount, setScanCount]     = useState(0);
   const [countLoading, setCountLoading] = useState(true);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // ── Edit profile state ──
+  const [firstName, setFirstName]   = useState('');
+  const [lastName, setLastName]     = useState('');
+  const [gender, setGender]         = useState('');
+  const [birthDay, setBirthDay]     = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthYear, setBirthYear]   = useState('');
+  const [skinColor, setSkinColor]   = useState('');
+  const [eyeColor, setEyeColor]     = useState('');
+  const [hairColor, setHairColor]   = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // ── Change password state ──
+  const [curPw, setCurPw]         = useState('');
+  const [newPw, setNewPw]         = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showCur, setShowCur]     = useState(false);
+  const [showNew, setShowNew]     = useState(false);
+  const [showConf, setShowConf]   = useState(false);
+  const [pwDone, setPwDone]       = useState(false);
+  const [savingPw, setSavingPw]   = useState(false);
+
+  // Populate edit form from profile
   useEffect(() => {
-    if (userProfile) {
-      setDraftFirst(userProfile.firstName);
-      setDraftLast(userProfile.lastName);
-    }
+    if (!userProfile) return;
+    setFirstName(userProfile.firstName || '');
+    setLastName(userProfile.lastName || '');
+    setGender(userProfile.gender || '');
+    setBirthDay(String(userProfile.birthDay || ''));
+    setBirthMonth(String(userProfile.birthMonth || ''));
+    setBirthYear(String(userProfile.birthYear || ''));
+    setSkinColor(userProfile.skinColor || '');
+    setEyeColor((userProfile as any).eyeColor || '');
+    setHairColor((userProfile as any).hairColor || '');
   }, [userProfile]);
 
+  // Scan count
   useEffect(() => {
-    const loadCount = async () => {
-      if (!user) { setCountLoading(false); return; }
+    if (!user) { setCountLoading(false); return; }
+    (async () => {
       try {
-        const cq = query(collection(db, 'scans'), where('userId', '==', user.uid));
-        const snap = await getCountFromServer(cq);
+        const snap = await getCountFromServer(
+            query(collection(db, 'users', user.uid, 'scans'))
+        );
         setScanCount(snap.data().count);
-      } catch (e) { console.error(e); }
+      } catch { /* silent */ }
       finally { setCountLoading(false); }
-    };
-    loadCount();
+    })();
   }, [user]);
 
-  const saveName = async () => {
-    if (!draftFirst.trim()) { toast.error('First name cannot be empty'); return; }
-    setSavingName(true);
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
+    setUploadingPhoto(true);
     try {
-      const fullName = `${draftFirst.trim()} ${draftLast.trim()}`.trim();
-      await updateDoc(doc(db, 'users', user!.uid), {
-        firstName: draftFirst.trim(),
-        lastName: draftLast.trim(),
+      const url = await uploadToCloudinary(file);
+      await updateDoc(doc(db, 'users', user.uid), { photoUri: url, updatedAt: new Date().toISOString() });
+      if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: url });
+      await refreshProfile();
+      toast.success('Profile photo updated!');
+    } catch { toast.error('Failed to upload photo'); }
+    finally { setUploadingPhoto(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+
+  const saveEdit = async () => {
+    if (!firstName.trim()) { toast.error('First name is required'); return; }
+    setSavingEdit(true);
+    try {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const updates: Record<string, any> = {
+        firstName: firstName.trim(),
+        lastName:  lastName.trim(),
+        gender,
+        skinColor,
+        eyeColor,
+        hairColor,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      if (birthDay && birthMonth && birthYear) {
+        updates.birthDay   = parseInt(birthDay);
+        updates.birthMonth = parseInt(birthMonth);
+        updates.birthYear  = parseInt(birthYear);
+      }
+      await updateDoc(doc(db, 'users', user!.uid), updates);
       if (auth.currentUser) await updateProfile(auth.currentUser, { displayName: fullName });
       await refreshProfile();
-      setEditingName(false);
-      toast.success('Name updated!');
-    } catch { toast.error('Failed to update name'); }
-    finally { setSavingName(false); }
+      toast.success('Profile updated!');
+      setTab('profile');
+    } catch { toast.error('Failed to save changes'); }
+    finally { setSavingEdit(false); }
+  };
+
+  const savePassword = async () => {
+    if (!curPw) { toast.error('Enter your current password'); return; }
+    if (!isPwValid(newPw)) { toast.error('New password does not meet requirements'); return; }
+    if (newPw !== confirmPw) { toast.error('Passwords do not match'); return; }
+    setSavingPw(true);
+    try {
+      const credential = EmailAuthProvider.credential(user!.email!, curPw);
+      await reauthenticateWithCredential(auth.currentUser!, credential);
+      await updatePassword(auth.currentUser!, newPw);
+      setPwDone(true);
+      setCurPw(''); setNewPw(''); setConfirmPw('');
+      toast.success('Password changed successfully!');
+    } catch (e: any) {
+      const msg =
+          e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'
+              ? 'Current password is incorrect'
+              : e.code === 'auth/requires-recent-login'
+                  ? 'Session expired — please log out and back in'
+                  : e.code === 'auth/too-many-requests'
+                      ? 'Too many attempts — wait a moment'
+                      : 'Failed to change password';
+      toast.error(msg);
+    } finally { setSavingPw(false); }
   };
 
   const handleLogout = async () => { await logout(); navigate('/'); };
 
-  // Format join date from ISO string (mobile app stores it as string)
+  // ── Derived display values ─────────────────────────────────────────────────
+  const fullName  = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
+  const initials  = userProfile
+      ? `${userProfile.firstName?.[0] || ''}${userProfile.lastName?.[0] || ''}`.toUpperCase()
+      : 'U';
+  const providers = user?.providerData.map(p => p.providerId) || [];
+  const isEmailProvider = providers.includes('password');
   const joinDate = (() => {
     const raw = userProfile?.createdAt || user?.metadata.creationTime;
     if (!raw) return '—';
     try { return new Date(raw).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
     catch { return '—'; }
   })();
-
-  const fullName   = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
-  const initials   = userProfile
-      ? `${userProfile.firstName[0] || ''}${userProfile.lastName[0] || ''}`.toUpperCase()
-      : (isGuest ? 'G' : 'U');
-  const providers  = user?.providerData.map(p => p.providerId) || [];
-  const providerLabel = (id: string) =>
-      id === 'google.com' ? 'Google' : id === 'facebook.com' ? 'Facebook' : id === 'password' ? 'Email' : id;
+  const skinLabel = SKIN_COLORS.find(s => s.color === userProfile?.skinColor)?.label;
 
   if (!userProfile && !isGuest) return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="spin w-8 h-8 border-2 rounded-full" style={{ borderColor: 'var(--br2)', borderTopColor: 'var(--accent)' }} />
+        <div className="spin w-8 h-8 border-2 rounded-full" style={{ borderColor: 'var(--br2)', borderTopColor: 'var(--accent)' }}/>
       </div>
   );
 
@@ -86,150 +268,384 @@ export const Profile: React.FC = () => {
       <div className="max-w-md mx-auto text-center py-20 space-y-5">
         <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
              style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-          <ShieldCheck size={36} />
+          <ShieldCheck size={36}/>
         </div>
         <h2 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Create an account</h2>
-        <p style={{ color: 'var(--tx2)' }}>Guest accounts don't have a profile. Sign up for free to access your profile, save scans, and more.</p>
+        <p style={{ color: 'var(--tx2)' }}>Sign up for free to access your profile, save scans, and more.</p>
         <button onClick={() => navigate('/signup')} className="btn-accent px-6 py-3 rounded-xl text-sm">
           Create free account →
         </button>
       </div>
   );
 
+  // ── Tab labels ─────────────────────────────────────────────────────────────
+  const TABS: { id: Tab; label: string }[] = [
+    { id: 'profile',  label: 'Overview' },
+    { id: 'edit',     label: 'Edit Profile' },
+    ...(isEmailProvider ? [{ id: 'password' as Tab, label: 'Change Password' }] : []),
+  ];
+
   return (
-      <div className="max-w-2xl mx-auto space-y-5 pb-10">
+      <div className="max-w-2xl mx-auto space-y-5 pb-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
-          {/* Avatar + name card */}
-          <div className="rounded-2xl p-7 space-y-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
-            <div className="flex items-start gap-5">
-
-              {/* Avatar — shows photo from Cloudinary if available */}
-              {userProfile?.photoUri ? (
-                  <img
-                      src={userProfile.photoUri}
-                      alt={fullName}
-                      className="w-20 h-20 rounded-2xl object-cover flex-shrink-0"
-                      style={{ boxShadow: '0 8px 24px var(--accent-glow)', border: '2px solid var(--accent)' }}
-                  />
-              ) : (
-                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-extrabold text-white flex-shrink-0"
-                       style={{ background: 'var(--accent)', boxShadow: '0 8px 24px var(--accent-glow)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-                    {initials}
-                  </div>
-              )}
-
-              {/* Name */}
-              <div className="flex-1 min-w-0">
-                {editingName ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                            type="text" value={draftFirst} onChange={e => setDraftFirst(e.target.value)}
-                            placeholder="First name"
-                            className="flex-1 px-3 py-2 rounded-xl text-base font-bold outline-none"
-                            style={{ background: 'var(--surface2)', border: '1.5px solid var(--accent)', color: 'var(--tx)' }}
-                            autoFocus
-                        />
-                        <input
-                            type="text" value={draftLast} onChange={e => setDraftLast(e.target.value)}
-                            placeholder="Last name"
-                            className="flex-1 px-3 py-2 rounded-xl text-base font-bold outline-none"
-                            style={{ background: 'var(--surface2)', border: '1.5px solid var(--accent)', color: 'var(--tx)' }}
-                            onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
-                        />
-                        <button onClick={saveName} disabled={savingName}
-                                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'var(--accent)', color: '#fff' }}>
-                          {savingName ? <span className="spin w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" /> : <Check size={16} />}
-                        </button>
-                        <button onClick={() => { setEditingName(false); setDraftFirst(userProfile?.firstName || ''); setDraftLast(userProfile?.lastName || ''); }}
-                                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'var(--accent-dim)', color: 'var(--tx2)' }}>
-                          <X size={16} />
-                        </button>
-                      </div>
-                    </div>
+          {/* ── Avatar + identity ── */}
+          <div className="rounded-2xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+            <div className="flex items-center gap-5">
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                {userProfile?.photoUri ? (
+                    <img src={userProfile.photoUri} alt={fullName}
+                         className="w-20 h-20 rounded-2xl object-cover"
+                         style={{ border: '2px solid var(--accent)', boxShadow: '0 8px 24px var(--accent-glow)' }}
+                         onError={e => { e.currentTarget.style.display = 'none'; }}/>
                 ) : (
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-xl font-extrabold truncate" style={{ color: 'var(--tx)' }}>{fullName || 'No name set'}</h1>
-                      <button onClick={() => setEditingName(true)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                              style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                        <Edit2 size={13} />
-                      </button>
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-extrabold"
+                         style={{ background: 'var(--accent)', color: '#070d1a', boxShadow: '0 8px 24px var(--accent-glow)' }}>
+                      {initials}
                     </div>
                 )}
-                <p className="text-sm mt-1" style={{ color: 'var(--tx2)' }}>{user?.email}</p>
-                {providers.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {providers.map(p => (
-                          <span key={p} className="px-2 py-0.5 rounded-md text-xs font-semibold"
-                                style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                      {providerLabel(p)}
-                    </span>
-                      ))}
-                    </div>
-                )}
+                <button onClick={() => fileRef.current?.click()} disabled={uploadingPhoto}
+                        className="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl flex items-center justify-center transition-transform hover:scale-110"
+                        style={{ background: 'var(--accent)', color: '#070d1a', boxShadow: '0 4px 12px rgba(0,229,255,0.3)' }}>
+                  {uploadingPhoto ? <Loader2 size={14} className="animate-spin"/> : <Camera size={14}/>}
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange}/>
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl font-extrabold truncate" style={{ color: 'var(--tx)' }}>{fullName || 'No name set'}</h1>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--tx2)' }}>{user?.email}</p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {providers.map(p => (
+                      <span key={p} className="px-2 py-0.5 rounded-md text-xs font-semibold"
+                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                    {p === 'google.com' ? 'Google' : p === 'facebook.com' ? 'Facebook' : p === 'password' ? 'Email' : p}
+                  </span>
+                  ))}
+                </div>
               </div>
             </div>
+          </div>
 
-            {/* Stats grid */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { icon: Scan,       label: 'Total scans',    value: countLoading ? '…' : scanCount },
-                { icon: Calendar,   label: 'Member since',   value: joinDate },
-                { icon: Mail,       label: 'Email',          value: user?.email || '—' },
-                { icon: ShieldCheck,label: 'Account status', value: userProfile?.isEmailVerified ? 'Verified' : 'Active' },
-              ].map(({ icon: Icon, label, value }) => (
-                  <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Icon size={14} style={{ color: 'var(--accent)' }} />
-                      <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>{label}</span>
+          {/* ── Tabs ── */}
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--surface)' }}>
+            {TABS.map(t => (
+                <button key={t.id} onClick={() => { setTab(t.id); setPwDone(false); }}
+                        className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all"
+                        style={{
+                          background: tab === t.id ? 'var(--accent)' : 'transparent',
+                          color: tab === t.id ? '#070d1a' : 'var(--tx2)',
+                        }}>
+                  {t.label}
+                </button>
+            ))}
+          </div>
+
+          {/* ── Tab content ── */}
+          <AnimatePresence mode="wait">
+
+            {/* ─── OVERVIEW ─── */}
+            {tab === 'profile' && (
+                <motion.div key="profile" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                            className="space-y-4">
+                  {/* Stats grid */}
+                  <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Account stats</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { icon: Scan,        label: 'Total scans',    value: countLoading ? '…' : scanCount },
+                        { icon: Calendar,    label: 'Member since',   value: joinDate },
+                        { icon: Mail,        label: 'Email',          value: user?.email || '—' },
+                        { icon: ShieldCheck, label: 'Account status', value: userProfile?.isEmailVerified ? 'Verified ✓' : 'Active' },
+                      ].map(({ icon: Icon, label, value }) => (
+                          <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Icon size={13} style={{ color: 'var(--accent)' }}/>
+                              <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>{label}</span>
+                            </div>
+                            <p className="text-sm font-semibold truncate" style={{ color: 'var(--tx)' }}>{String(value)}</p>
+                          </div>
+                      ))}
                     </div>
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--tx)' }}>{String(value)}</p>
                   </div>
-              ))}
-            </div>
 
-            {/* Extra profile info from mobile app data */}
-            {(userProfile?.gender || userProfile?.birthYear) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {userProfile?.gender && (
-                      <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <UserIcon size={14} style={{ color: 'var(--accent)' }} />
-                          <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Gender</span>
+                  {/* Physical profile */}
+                  {(userProfile?.gender || userProfile?.birthYear || userProfile?.skinColor) && (
+                      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Physical profile</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {userProfile.gender && (
+                              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <UserIcon size={13} style={{ color: 'var(--accent)' }}/>
+                                  <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Gender</span>
+                                </div>
+                                <p className="text-sm font-semibold capitalize" style={{ color: 'var(--tx)' }}>{userProfile.gender}</p>
+                              </div>
+                          )}
+                          {userProfile.birthYear && (
+                              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Calendar size={13} style={{ color: 'var(--accent)' }}/>
+                                  <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Date of birth</span>
+                                </div>
+                                <p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>
+                                  {userProfile.birthDay}/{userProfile.birthMonth}/{userProfile.birthYear}
+                                </p>
+                              </div>
+                          )}
+                          {userProfile.skinColor && (
+                              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: userProfile.skinColor }}/>
+                                  <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Skin tone</span>
+                                </div>
+                                <p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>{skinLabel || '—'}</p>
+                              </div>
+                          )}
                         </div>
-                        <p className="text-sm font-semibold capitalize" style={{ color: 'var(--tx)' }}>{userProfile.gender}</p>
                       </div>
                   )}
-                  {userProfile?.birthYear && (
-                      <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Calendar size={14} style={{ color: 'var(--accent)' }} />
-                          <span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Date of birth</span>
-                        </div>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>
-                          {userProfile.birthDay}/{userProfile.birthMonth}/{userProfile.birthYear}
-                        </p>
-                      </div>
-                  )}
-                </div>
+
+                  {/* Quick actions */}
+                  <div className="rounded-2xl p-5 space-y-2" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                    <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--accent)' }}>Quick actions</p>
+                    {[
+                      { label: 'Edit profile information', onClick: () => setTab('edit') },
+                      ...(isEmailProvider ? [{ label: 'Change password', onClick: () => setTab('password') }] : []),
+                    ].map(a => (
+                        <button key={a.label} onClick={a.onClick}
+                                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover"
+                                style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>
+                          {a.label}
+                          <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/>
+                        </button>
+                    ))}
+                    <button onClick={handleLogout}
+                            className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all"
+                            style={{ background: 'rgba(239,68,68,0.07)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.14)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.07)'; }}>
+                      <span className="flex items-center gap-2"><LogOut size={14}/> Sign out</span>
+                    </button>
+                  </div>
+                </motion.div>
             )}
-          </div>
 
-          {/* Sign out */}
-          <div className="rounded-2xl p-6 mt-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
-            <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--tx)' }}>Account actions</h3>
-            <button onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                    style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}>
-              <LogOut size={15} /> Sign out
-            </button>
-          </div>
+            {/* ─── EDIT PROFILE ─── */}
+            {tab === 'edit' && (
+                <motion.div key="edit" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                            className="rounded-2xl p-6 space-y-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+
+                  <div className="flex items-center gap-2">
+                    <p className="text-base font-extrabold" style={{ color: 'var(--tx)' }}>Edit Profile</p>
+                    <Tip text="Changes are saved to Firestore and synced across web and mobile."/>
+                  </div>
+
+                  {/* Name row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: 'First name', val: firstName, set: setFirstName, tip: 'Your first name as it appears on reports.' },
+                      { label: 'Last name',  val: lastName,  set: setLastName,  tip: 'Your last name or family name.' },
+                    ].map(({ label, val, set, tip }) => (
+                        <div key={label}>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>{label}</label>
+                            <Tip text={tip}/>
+                          </div>
+                          <input type="text" value={val} onChange={e => set(e.target.value)}
+                                 className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                                 style={{ background: 'var(--surface2)', border: '1px solid var(--br)', color: 'var(--tx)' }}/>
+                        </div>
+                    ))}
+                  </div>
+
+                  {/* Gender */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Gender</label>
+                      <Tip text="Used in PDF reports and for personalised health insights."/>
+                    </div>
+                    <div className="flex gap-2">
+                      {['male', 'female'].map(g => (
+                          <button key={g} onClick={() => setGender(g)}
+                                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all"
+                                  style={{
+                                    background: gender === g ? 'var(--accent)' : 'var(--surface2)',
+                                    color: gender === g ? '#070d1a' : 'var(--tx2)',
+                                    border: `1px solid ${gender === g ? 'var(--accent)' : 'var(--br)'}`,
+                                  }}>
+                            {g}
+                          </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Date of birth */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Date of birth</label>
+                      <Tip text="Your age is used to calculate skin cancer risk levels in reports."/>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Day',   val: birthDay,   set: setBirthDay,   min: 1, max: 31,   placeholder: 'DD' },
+                        { label: 'Month', val: birthMonth, set: setBirthMonth, min: 1, max: 12,   placeholder: 'MM' },
+                        { label: 'Year',  val: birthYear,  set: setBirthYear,  min: 1900, max: 2099, placeholder: 'YYYY' },
+                      ].map(({ label, val, set, placeholder }) => (
+                          <div key={label}>
+                            <p className="text-[10px] font-semibold mb-1" style={{ color: 'var(--tx3)' }}>{label}</p>
+                            <input type="number" value={val} onChange={e => set(e.target.value)}
+                                   placeholder={placeholder}
+                                   className="w-full px-3 py-2.5 rounded-xl text-sm outline-none text-center"
+                                   style={{ background: 'var(--surface2)', border: '1px solid var(--br)', color: 'var(--tx)' }}/>
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Skin tone */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Skin tone</label>
+                      <Tip text="Supports the doctor's review of your skin type results."/>
+                    </div>
+                    <ColorRow options={SKIN_COLORS} selected={skinColor} onChange={setSkinColor}/>
+                    {skinColor && (
+                        <p className="text-xs mt-1.5" style={{ color: 'var(--accent)' }}>
+                          {SKIN_COLORS.find(s => s.color === skinColor)?.label}
+                        </p>
+                    )}
+                  </div>
+
+                  {/* Eye colour */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Eye colour</label>
+                      <Tip text="Stored in your profile for full-report patient information."/>
+                    </div>
+                    <ColorRow options={EYE_COLORS} selected={eyeColor} onChange={setEyeColor}/>
+                  </div>
+
+                  {/* Hair colour */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Hair colour</label>
+                      <Tip text="Included in PDF patient information section."/>
+                    </div>
+                    <ColorRow options={HAIR_COLORS} selected={hairColor} onChange={setHairColor}/>
+                  </div>
+
+                  {/* Save */}
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">
+                      Cancel
+                    </button>
+                    <button onClick={saveEdit} disabled={savingEdit}
+                            className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                      {savingEdit ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>}
+                      {savingEdit ? 'Saving…' : 'Save changes'}
+                    </button>
+                  </div>
+                </motion.div>
+            )}
+
+            {/* ─── CHANGE PASSWORD ─── */}
+            {tab === 'password' && (
+                <motion.div key="password" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                            className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+
+                  <AnimatePresence mode="wait">
+                    {pwDone ? (
+                        /* Success state */
+                        <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                    className="text-center py-8 space-y-4">
+                          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
+                               style={{ background: 'rgba(34,197,94,0.1)' }}>
+                            <CheckCircle2 size={40} color="#22c55e"/>
+                          </div>
+                          <h2 className="text-xl font-extrabold" style={{ color: 'var(--tx)' }}>Password changed!</h2>
+                          <p className="text-sm" style={{ color: 'var(--tx2)' }}>Your password has been updated successfully.</p>
+                          <button onClick={() => { setPwDone(false); setTab('profile'); }}
+                                  className="btn-accent px-6 py-2.5 rounded-xl text-sm">
+                            Back to profile
+                          </button>
+                        </motion.div>
+                    ) : (
+                        <motion.div key="form" className="space-y-5">
+                          <div className="flex items-center gap-2">
+                            <p className="text-base font-extrabold" style={{ color: 'var(--tx)' }}>Change Password</p>
+                            <Tip text="You need to enter your current password to verify it's you before setting a new one."/>
+                          </div>
+
+                          {/* Current password */}
+                          {[
+                            { label: 'Current password', val: curPw, set: setCurPw, show: showCur, toggle: () => setShowCur(v => !v), tip: 'Enter the password you currently use to log in.' },
+                            { label: 'New password',      val: newPw, set: setNewPw, show: showNew, toggle: () => setShowNew(v => !v), tip: 'Minimum 8 chars, uppercase, lowercase, number, special character.' },
+                            { label: 'Confirm new password', val: confirmPw, set: setConfirmPw, show: showConf, toggle: () => setShowConf(v => !v), tip: 'Re-type the new password to confirm it.' },
+                          ].map(({ label, val, set, show, toggle, tip }) => (
+                              <div key={label}>
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>{label}</label>
+                                  <Tip text={tip}/>
+                                </div>
+                                <div className="relative">
+                                  <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--tx3)' }}/>
+                                  <input type={show ? 'text' : 'password'} value={val}
+                                         onChange={e => set(e.target.value)}
+                                         className="w-full pl-9 pr-10 py-2.5 rounded-xl text-sm outline-none"
+                                         style={{ background: 'var(--surface2)', border: '1px solid var(--br)', color: 'var(--tx)' }}/>
+                                  <button type="button" onClick={toggle}
+                                          className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--tx3)' }}>
+                                    {show ? <EyeOff size={15}/> : <Eye size={15}/>}
+                                  </button>
+                                </div>
+                                {/* Confirm mismatch warning */}
+                                {label.includes('Confirm') && confirmPw && newPw !== confirmPw && (
+                                    <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#ef4444' }}>
+                                      <AlertTriangle size={11}/> Passwords do not match
+                                    </p>
+                                )}
+                              </div>
+                          ))}
+
+                          {/* Strength checklist */}
+                          {newPw.length > 0 && (
+                              <div className="rounded-xl p-3 space-y-1.5"
+                                   style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--tx3)' }}>
+                                  Password requirements
+                                </p>
+                                {pwChecks(newPw).map(({ label, pass }) => (
+                                    <div key={label} className="flex items-center gap-2">
+                                      <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0"
+                                           style={{ background: pass ? '#22c55e' : 'var(--br2)' }}>
+                                        {pass && <Check size={8} color="#fff"/>}
+                                      </div>
+                                      <span className="text-xs" style={{ color: pass ? '#22c55e' : 'var(--tx3)' }}>{label}</span>
+                                    </div>
+                                ))}
+                              </div>
+                          )}
+
+                          <div className="flex gap-3 pt-1">
+                            <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">
+                              Cancel
+                            </button>
+                            <button onClick={savePassword} disabled={savingPw || !curPw || !isPwValid(newPw) || newPw !== confirmPw}
+                                    className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                              {savingPw ? <Loader2 size={14} className="animate-spin"/> : <Lock size={14}/>}
+                              {savingPw ? 'Saving…' : 'Change password'}
+                            </button>
+                          </div>
+                        </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
   );
