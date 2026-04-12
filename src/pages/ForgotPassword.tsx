@@ -20,12 +20,25 @@ export const ForgotPassword: React.FC = () => {
     if (!email) { toast.error('Please enter your email'); return; }
     setLoading(true);
     try {
+      const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
+
+      // 1. Check if email exists first
+      const checkRes = await fetch(`${flaskUrl}/api/check-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const checkData = await checkRes.json().catch(() => ({}));
+
+      if (!checkData.exists) {
+        throw new Error('No account found with this email address.');
+      }
+
+      // 2. Generate and send OTP
       const otp = generateOTP();
-      // Store OTP + email in sessionStorage for verification on reset page
       sessionStorage.setItem('reset_otp',   otp);
       sessionStorage.setItem('reset_email', email);
 
-      const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
       const res = await fetch(`${flaskUrl}/api/send-password-reset`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },

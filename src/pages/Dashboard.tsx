@@ -62,22 +62,40 @@ export const Dashboard: React.FC = () => {
     setStepIdx(0);
     try {
       const imageUrl = await uploadImage(selectedFile);
-      const prediction = await predictSkinDisease({ imageUrl });
+
+      let prediction;
+      try {
+        prediction = await predictSkinDisease({ imageUrl });
+      } catch (aiError) {
+        console.warn("Backend offline. Using fallback data to continue Firebase upload.");
+        prediction = {
+          disease: "Pending AI Analysis",
+          confidence: 0,
+          description: "The AI models are currently offline. Your image has been successfully saved to your history for later review.",
+          suggestions: ["Check back later when the AI backend is online."]
+        };
+      }
+
       setResult(prediction);
       if (isGuest) { localStorage.setItem('guest_scanned', 'true'); setHasScanned(true); }
+
       if (user) {
-        await addDoc(collection(db, 'scans'), {
+        await addDoc(collection(db, 'users', user.uid, 'scans'), {
           userId: user.uid,
-          imageUrl,
-          disease: prediction.disease,
+          photoUri: imageUrl,
+          analysis: prediction.disease,
           confidence: prediction.confidence,
           description: prediction.description,
           createdAt: serverTimestamp(),
+          bodyView: 'front',
+          x: 0,
+          y: 0,
+          source: 'web' // <-- ADDED THIS: Flags that the scan came from the website
         });
       }
-      toast.success('Analysis complete!');
+      toast.success('Image saved successfully!');
     } catch (error: any) {
-      toast.error(error.message || 'Analysis failed. Please try again.');
+      toast.error(error.message || 'Upload failed. Please try again.');
     } finally { setLoading(false); }
   }, [hasScanned, isGuest, user]);
 

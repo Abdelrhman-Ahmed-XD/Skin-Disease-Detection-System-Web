@@ -118,7 +118,10 @@ export const Landing: React.FC = () => {
           </div>
 
           <div className="relative grid gap-10 lg:grid-cols-2 lg:items-center">
-            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+            {/* CHANGED TO whileInView */}
+            <motion.div initial={{ opacity: 0, y: 24 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.2 }}
                         transition={{ duration: 0.55, ease: EASE }} className="space-y-6">
               <h1 className="font-extrabold leading-[1.05] transition-colors duration-300"
                   style={{ fontSize: 'clamp(2.6rem, 5.5vw, 4rem)', color: 'var(--tx)' }}>
@@ -149,8 +152,10 @@ export const Landing: React.FC = () => {
               </p>
             </motion.div>
 
-            {/* Hero card */}
-            <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
+            {/* Hero card - CHANGED TO whileInView */}
+            <motion.div initial={{ opacity: 0, x: 24 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, amount: 0.2 }}
                         transition={{ duration: 0.6, delay: 0.08, ease: EASE }}
                         className="float mx-auto w-full max-w-[400px] lg:max-w-none">
               <HeroCard/>
@@ -279,7 +284,7 @@ export const Landing: React.FC = () => {
         {/* Footer */}
         <footer className="text-center pt-4 pb-1 transition-colors duration-300" style={{ borderTop: '1px solid var(--br)' }}>
           <p className="text-xs transition-colors duration-300" style={{ color: 'var(--tx3)' }}>
-            © 2025 SkinSight · Graduation Project · Faculty of Computers &amp; AI ·{' '}
+            © 2026 SkinSight · Graduation Project · Faculty of Computer &amp; Artificial intelligence   ·{' '}
             <a href="https://github.com/Abdelrhman-Ahmed-XD/Skin-Disease-Detection-System"
                className="hover:underline" style={{ color: 'var(--accent)' }}>GitHub</a>
           </p>

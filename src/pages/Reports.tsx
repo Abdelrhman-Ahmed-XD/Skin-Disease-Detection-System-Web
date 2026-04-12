@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs } from 'firebase/firestore';
 import { TrendingUp, ShieldCheck, Activity, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -21,12 +21,19 @@ export const Reports: React.FC = () => {
         if (!user) { setLoading(false); return; }
         const fetch = async () => {
             try {
-                const q = query(collection(db, 'scans'), where('userId', '==', user.uid));
+                // --- SYNC FIX: Query nested subcollection ---
+                const q = query(collection(db, 'users', user.uid, 'scans'));
                 const snap = await getDocs(q);
                 const scans = snap.docs.map(d => d.data());
                 setTotal(scans.length);
                 const freq: Record<string, number> = {};
-                scans.forEach(s => { freq[s.disease] = (freq[s.disease] || 0) + 1; });
+                scans.forEach(s => {
+                    // Fallback handles both web and mobile keys
+                    const diseaseName = s.analysis || s.disease || 'Unknown';
+                    if (diseaseName) {
+                        freq[diseaseName] = (freq[diseaseName] || 0) + 1;
+                    }
+                });
                 setData(Object.entries(freq).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value));
             } catch (e) { console.error(e); }
             finally { setLoading(false); }

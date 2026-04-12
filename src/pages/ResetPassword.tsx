@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import toast from 'react-hot-toast';
 
@@ -27,7 +27,7 @@ export const ResetPassword: React.FC = () => {
       navigate('/forgot-password');
     }
     if (step === 'otp') inputsRef.current[0]?.focus();
-  }, [step]);
+  }, [step, navigate, storedEmail, storedOtp]);
 
   const handleOtpChange = (idx: number, val: string) => {
     if (!/^\d*$/.test(val)) return;
@@ -66,13 +66,30 @@ export const ResetPassword: React.FC = () => {
     if (password !== confirm) { toast.error('Passwords do not match'); return; }
     setLoading(true);
     try {
-      // Use Firebase to send a password reset email to let them change their password
-      // This is the secure path since we can't update passwords directly from frontend
-      await sendPasswordResetEmail(auth, storedEmail);
-      sessionStorage.removeItem('reset_otp');
-      sessionStorage.removeItem('reset_email');
-      toast.success('Password reset email sent! Check your inbox to complete the reset.');
-      setStep('done');
+      const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
+      const res = await fetch(`${flaskUrl}/api/update-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: storedEmail, new_password: password }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to update password');
+      }
+
+      toast.success('Password updated successfully!');
+
+      // AUTO SIGN-IN LOGIC
+      try {
+        await signInWithEmailAndPassword(auth, storedEmail, password);
+        sessionStorage.removeItem('reset_otp');
+        sessionStorage.removeItem('reset_email');
+        navigate('/dashboard'); // Directs user immediately to the app
+      } catch (loginErr) {
+        setStep('done'); // Fallback to manual login if auto-login fails
+      }
+
     } catch (error: any) {
       toast.error(error.message || 'Failed to reset password');
     } finally { setLoading(false); }
@@ -139,7 +156,7 @@ export const ResetPassword: React.FC = () => {
                     <div className="text-center mb-7">
                       <h1 className="text-2xl font-extrabold" style={{ color:'var(--tx)' }}>Reset your password</h1>
                       <p className="text-sm mt-2" style={{ color:'var(--tx2)' }}>
-                        We'll send a final reset link to <strong style={{ color:'var(--tx)' }}>{storedEmail}</strong> to complete the change.
+                        Set your new password below.
                       </p>
                     </div>
                     <form onSubmit={handleReset} className="space-y-4">
@@ -168,13 +185,13 @@ export const ResetPassword: React.FC = () => {
                         {loading
                             ? <span className="spin w-4 h-4 border-2 border-current/30 border-t-current rounded-full"/>
                             : <Lock size={15}/>}
-                        {loading ? 'Sending link…' : 'Reset password'}
+                        {loading ? 'Updating…' : 'Reset password'}
                       </button>
                     </form>
                   </motion.div>
               )}
 
-              {/* Done */}
+              {/* Done (Fallback if auto-login fails) */}
               {step === 'done' && (
                   <motion.div key="done" initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }}
                               className="text-center space-y-5 py-4">
@@ -183,10 +200,9 @@ export const ResetPassword: React.FC = () => {
                       <CheckCircle2 size={32}/>
                     </div>
                     <div>
-                      <h2 className="text-xl font-extrabold mb-2" style={{ color:'var(--tx)' }}>Check your email</h2>
+                      <h2 className="text-xl font-extrabold mb-2" style={{ color:'var(--tx)' }}>Password updated</h2>
                       <p className="text-sm leading-relaxed" style={{ color:'var(--tx2)' }}>
-                        A password reset link was sent to <strong style={{ color:'var(--tx)' }}>{storedEmail}</strong>.
-                        Click it to set your new password, then sign in.
+                        Your password has been successfully reset. You can now sign in with your new password.
                       </p>
                     </div>
                     <button onClick={() => navigate('/login')} className="btn-accent w-full py-3 rounded-xl text-sm">
