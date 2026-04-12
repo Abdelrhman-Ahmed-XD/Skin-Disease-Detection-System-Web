@@ -1,8 +1,9 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Brain, ShieldCheck, History, Zap, Eye, Scan } from 'lucide-react';
+import { ArrowRight, Brain, ShieldCheck, History, Zap, Eye, Scan, Upload, Cpu, BarChart2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { HeroCard } from '../components/HeroCard';
 
 const GithubIcon = ({ size = 14 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -11,7 +12,6 @@ const GithubIcon = ({ size = 14 }: { size?: number }) => (
 );
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
@@ -19,33 +19,85 @@ const fadeUp = {
   transition: { duration: 0.5, ease: EASE },
 };
 
+// ── Animated pipeline card for "How it works" section ───────────────────────
+const PipelineCard: React.FC = () => {
+  const [active, setActive] = useState(0);
+  const steps = [
+    { icon: Upload,   label: 'Upload',    color: '#60a5fa', desc: 'Photo sent to Cloudinary CDN' },
+    { icon: Eye,      label: 'UNet Mask', color: '#34d399', desc: 'Pixel-level lesion segmentation' },
+    { icon: Cpu,      label: 'CNN Model', color: '#a78bfa', desc: 'Disease classification' },
+    { icon: BarChart2,label: 'Results',   color: '#00e5ff', desc: 'Confidence score + description' },
+  ];
+  useEffect(() => {
+    const id = setInterval(() => setActive(a => (a + 1) % steps.length), 2000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+      <div className="rounded-xl p-5" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>AI Pipeline</p>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                style={{ background: 'rgba(0,229,255,0.1)', color: '#00e5ff' }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-[#00e5ff]"/>Running
+        </span>
+        </div>
+        <div className="flex items-center gap-1">
+          {steps.map(({ icon: Icon, label, color }, i) => (
+              <React.Fragment key={label}>
+                <div className="flex flex-col items-center gap-1.5 flex-1">
+                  <motion.div
+                      animate={{ scale: active === i ? 1.15 : 1, boxShadow: active === i ? `0 0 16px ${color}55` : 'none' }}
+                      transition={{ duration: 0.3 }}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: active === i ? color + '22' : 'rgba(255,255,255,0.04)',
+                        border: `1.5px solid ${active === i ? color : 'rgba(255,255,255,0.08)'}` }}>
+                    <Icon size={15} style={{ color: active >= i ? color : 'rgba(255,255,255,0.2)' }}/>
+                  </motion.div>
+                  <span className="text-[9px] font-semibold text-center leading-tight"
+                        style={{ color: active === i ? color : 'rgba(255,255,255,0.3)' }}>{label}</span>
+                </div>
+                {i < steps.length - 1 && (
+                    <motion.div className="h-0.5 flex-1 rounded-full mb-3"
+                                animate={{ background: active > i
+                                      ? `linear-gradient(90deg, ${steps[i].color}, ${steps[i+1].color})`
+                                      : 'rgba(255,255,255,0.06)' }}
+                                transition={{ duration: 0.4 }}/>
+                )}
+              </React.Fragment>
+          ))}
+        </div>
+        <AnimatePresence mode="wait">
+          <motion.p key={active}
+                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    className="text-[10px] text-center mt-4 font-medium"
+                    style={{ color: steps[active].color }}>
+            {steps[active].desc}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+  );
+};
+
+// ── Landing ──────────────────────────────────────────────────────────────────
 export const Landing: React.FC = () => {
   const { user, isGuest, loginAsGuest } = useAuth();
   const navigate = useNavigate();
   const loggedIn = user || isGuest;
-
   const handleGuest = () => { if (!loggedIn) loginAsGuest(); navigate('/dashboard'); };
 
   const features = [
-    { icon: Brain,      title: 'CNN Classification',  desc: 'Deep neural network trained on 10+ skin conditions classifies your photo with high accuracy.' },
-    { icon: Eye,        title: 'UNet Segmentation',    desc: 'PyTorch UNet generates pixel-level masks that highlight exactly the affected skin region.' },
-    { icon: Zap,        title: 'Instant Results',      desc: 'Upload an image and receive the disease name, confidence score, and full description in seconds.' },
-    { icon: History,    title: 'Scan Timeline',        desc: 'Every scan is saved. Track how conditions evolve over time with your complete history.' },
-    { icon: ShieldCheck,'title': 'Firebase Secured',   desc: 'Firebase Auth protects your account. Images are stored on Cloudinary with user-scoped access.' },
-    { icon: Scan,       title: 'Mobile & Web',         desc: 'The same backend powers our React Native mobile app and this web platform seamlessly.' },
+    { icon: Brain,       title: 'CNN Classification', desc: 'Deep neural network trained on 10+ skin conditions classifies your photo with high accuracy.' },
+    { icon: Eye,         title: 'UNet Segmentation',  desc: 'PyTorch UNet generates pixel-level masks that highlight exactly the affected skin region.' },
+    { icon: Zap,         title: 'Instant Results',    desc: 'Upload an image and receive the disease name, confidence score, and full description in seconds.' },
+    { icon: History,     title: 'Scan Timeline',      desc: 'Every scan is saved. Track how conditions evolve over time with your complete history.' },
+    { icon: ShieldCheck, title: 'Firebase Secured',   desc: 'Firebase Auth protects your account. Images are stored on Cloudinary with user-scoped access.' },
+    { icon: Scan,        title: 'Mobile & Web',       desc: 'The same backend powers our React Native mobile app and this web platform seamlessly.' },
   ];
-
-  const steps = [
-    { n: '01', title: 'Upload a photo',      desc: 'A close-up, well-lit photo of the affected skin area works best. Supports JPG and PNG.' },
-    { n: '02', title: 'AI runs the models',  desc: 'CNN classifier identifies the condition while UNet generates a segmentation overlay of the area.' },
-    { n: '03', title: 'Review your results', desc: 'Get the disease name, confidence %, UNet mask, and a full description — all in seconds.' },
-  ];
-
   const stats = [
-    { val: '10+',  label: 'Conditions detected' },
-    { val: 'CNN',  label: 'Classification model' },
-    { val: 'UNet', label: 'Segmentation model' },
-    { val: '100%', label: 'Firebase secured' },
+    { val: '10+', label: 'Conditions detected' },
+    { val: 'CNN', label: 'Classification model' },
+    { val: 'UNet',label: 'Segmentation model' },
+    { val: '100%',label: 'Firebase secured' },
   ];
 
   return (
@@ -54,43 +106,30 @@ export const Landing: React.FC = () => {
         {/* ── Hero ── */}
         <section className="relative overflow-hidden rounded-2xl px-6 py-14 sm:px-10 sm:py-16"
                  style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
-
-          {/* Ambient blobs */}
           <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none select-none">
             <div className="blob absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full"
-                 style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.07) 0%, transparent 65%)' }} />
+                 style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.07) 0%, transparent 65%)' }}/>
             <div className="blob absolute -bottom-24 right-0 w-96 h-96 rounded-full"
-                 style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.05) 0%, transparent 65%)', animationDelay: '-4s' }} />
+                 style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.05) 0%, transparent 65%)', animationDelay: '-4s' }}/>
           </div>
 
           <div className="relative grid gap-10 lg:grid-cols-2 lg:items-center">
-            {/* Left */}
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.55, ease: EASE }} className="space-y-6">
-
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest"
-                   style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid rgba(0,229,255,0.2)' }}>
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent)' }} />
-                Graduation Project · Faculty of Computers &amp; AI
-              </div>
-
               <h1 className="font-extrabold leading-[1.05]"
                   style={{ fontSize: 'clamp(2.6rem, 5.5vw, 4rem)', color: 'var(--tx)' }}>
-                Detect skin<br />
-                <span style={{ color: 'var(--accent)' }}>conditions</span><br />
+                Detect skin<br/>
+                <span style={{ color: 'var(--accent)' }}>conditions</span><br/>
                 with AI.
               </h1>
-
               <p className="text-base leading-relaxed max-w-lg" style={{ color: 'var(--tx2)' }}>
-                Upload a photo of your skin — SkinSight's CNN + UNet models analyze it, identify the condition,
+                Upload a photo of your skin then SkinSight's CNN + UNet models analyze it, identify the condition,
                 and generate a pixel-level segmentation map in seconds.
               </p>
-
               <div className="flex flex-wrap gap-3">
                 <Link to={loggedIn ? '/dashboard' : '/signup'}
                       className="btn-accent px-5 py-2.5 rounded-xl text-sm inline-flex items-center gap-2">
-                  {loggedIn ? 'Open dashboard' : 'Start for free'}
-                  <ArrowRight size={14} />
+                  {loggedIn ? 'Open dashboard' : 'Start for free'}<ArrowRight size={14}/>
                 </Link>
                 <button onClick={handleGuest} className="btn-ghost px-5 py-2.5 rounded-xl text-sm">
                   Try as Guest
@@ -98,82 +137,19 @@ export const Landing: React.FC = () => {
                 <a href="https://github.com/Abdelrhman-Ahmed-XD/Skin-Disease-Detection-System"
                    target="_blank" rel="noreferrer"
                    className="btn-ghost px-5 py-2.5 rounded-xl text-sm inline-flex items-center gap-2">
-                  <GithubIcon size={14} /> GitHub
+                  <GithubIcon size={14}/> GitHub
                 </a>
               </div>
-
               <p className="text-xs leading-relaxed" style={{ color: 'var(--tx3)' }}>
                 ⚠ Results are not a medical diagnosis. Consult a dermatologist for any concerning skin changes.
               </p>
             </motion.div>
 
-            {/* Right — Hero card */}
+            {/* Hero card */}
             <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.6, delay: 0.08, ease: EASE }}
-                        className="float mx-auto w-full max-w-[360px] lg:max-w-none">
-              <div className="rounded-2xl overflow-hidden"
-                   style={{ background: '#070d1a', border: '1px solid rgba(0,229,255,0.15)',
-                     boxShadow: '0 24px 64px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,229,255,0.05)' }}>
-                {/* Window bar */}
-                <div className="flex items-center justify-between px-4 py-3"
-                     style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest"
-                        style={{ color: 'rgba(0,229,255,0.6)' }}>SkinSight Analysis</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                        style={{ background: 'rgba(0,229,255,0.1)', color: '#00e5ff' }}>● Live</span>
-                </div>
-
-                {/* Scan area */}
-                <div className="relative h-48 overflow-hidden"
-                     style={{ background: 'rgba(0,229,255,0.02)' }}>
-                  <div className="absolute inset-0 opacity-30"
-                       style={{ backgroundImage: 'repeating-linear-gradient(0deg,rgba(0,229,255,0.06) 0,rgba(0,229,255,0.06) 1px,transparent 1px,transparent 28px),repeating-linear-gradient(90deg,rgba(0,229,255,0.06) 0,rgba(0,229,255,0.06) 1px,transparent 1px,transparent 28px)' }} />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="pring w-28 h-28 rounded-full border-2 flex items-center justify-center"
-                         style={{ borderColor: 'rgba(0,229,255,0.45)' }}>
-                      <div className="w-20 h-20 rounded-full"
-                           style={{ background: 'radial-gradient(circle at 35% 35%, #a0786a, #6c4a3e 55%, #412a22 100%)' }} />
-                    </div>
-                    {/* Corner brackets */}
-                    {[['top-3 left-3','border-t-2 border-l-2'],['top-3 right-3','border-t-2 border-r-2'],
-                      ['bottom-3 left-3','border-b-2 border-l-2'],['bottom-3 right-3','border-b-2 border-r-2']].map(([pos, bdr], i) => (
-                        <div key={i} className={`absolute ${pos} w-5 h-5 ${bdr} rounded-sm`}
-                             style={{ borderColor: 'rgba(0,229,255,0.65)' }} />
-                    ))}
-                  </div>
-                  {/* Scan line */}
-                  <div className="scan-line absolute left-0 right-0 h-px"
-                       style={{ background: 'linear-gradient(90deg,transparent 0%,rgba(0,229,255,0.9) 50%,transparent 100%)',
-                         animation: 'scanln 2.8s ease-in-out infinite' }} />
-                </div>
-
-                {/* Result preview */}
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5"
-                         style={{ color: 'rgba(255,255,255,0.3)' }}>Detected condition</p>
-                      <p className="text-sm font-bold" style={{ color: '#f0f6ff' }}>Melanocytic Nevus</p>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold"
-                          style={{ background: 'rgba(0,229,255,0.12)', color: '#00e5ff' }}>94.5%</span>
-                  </div>
-                  <div className="confidence-track">
-                    <div className="confidence-fill" style={{ width: '94.5%' }} />
-                  </div>
-                  <div className="flex gap-1.5">
-                    {['CNN Model', 'UNet Mask', 'Saved'].map(t => (
-                        <span key={t} className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
-                              style={{ background: 'rgba(0,229,255,0.08)', color: 'rgba(0,229,255,0.75)' }}>{t}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                        className="float mx-auto w-full max-w-[400px] lg:max-w-none">
+              <HeroCard/>
             </motion.div>
           </div>
         </section>
@@ -203,7 +179,7 @@ export const Landing: React.FC = () => {
                             style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                    <Icon size={17} />
+                    <Icon size={17}/>
                   </div>
                   <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--tx)' }}>{title}</h3>
                   <p className="text-xs leading-relaxed" style={{ color: 'var(--tx2)' }}>{desc}</p>
@@ -219,18 +195,27 @@ export const Landing: React.FC = () => {
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Process</p>
             <h2 className="text-3xl font-extrabold" style={{ color: 'var(--tx)' }}>Three steps to results</h2>
           </motion.div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {steps.map(({ n, title, desc }, i) => (
-                <motion.div key={n} {...fadeUp} transition={{ duration: 0.4, delay: i * 0.07 }}
-                            className="relative rounded-xl p-5 card-hover"
-                            style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-              <span className="text-6xl font-extrabold absolute top-3 right-4 select-none pointer-events-none leading-none"
-                    style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", color: 'var(--accent-dim)', opacity: 0.6 }}>{n}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest mb-2 block" style={{ color: 'var(--accent)' }}>Step {n}</span>
-                  <h3 className="text-sm font-bold mb-1.5" style={{ color: 'var(--tx)' }}>{title}</h3>
-                  <p className="text-xs leading-relaxed" style={{ color: 'var(--tx2)' }}>{desc}</p>
-                </motion.div>
-            ))}
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
+            <div className="space-y-4">
+              {[
+                { n: '01', title: 'Upload a photo',      desc: 'A close-up, well-lit photo of the affected skin area works best. Supports JPG and PNG.' },
+                { n: '02', title: 'AI runs the models',  desc: 'CNN classifier identifies the condition while UNet generates a segmentation overlay.' },
+                { n: '03', title: 'Review your results', desc: 'Get the disease name, confidence %, UNet mask, and a full description — all in seconds.' },
+              ].map(({ n, title, desc }, i) => (
+                  <motion.div key={n} {...fadeUp} transition={{ duration: 0.4, delay: i * 0.07 }}
+                              className="relative rounded-xl p-5 card-hover"
+                              style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                <span className="text-6xl font-extrabold absolute top-3 right-4 select-none pointer-events-none leading-none"
+                      style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", color: 'var(--accent-dim)', opacity: 0.6 }}>{n}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest mb-2 block" style={{ color: 'var(--accent)' }}>Step {n}</span>
+                    <h3 className="text-sm font-bold mb-1.5" style={{ color: 'var(--tx)' }}>{title}</h3>
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--tx2)' }}>{desc}</p>
+                  </motion.div>
+              ))}
+            </div>
+            <motion.div {...fadeUp} transition={{ duration: 0.5, delay: 0.15 }}>
+              <PipelineCard/>
+            </motion.div>
           </div>
         </section>
 
@@ -239,9 +224,9 @@ export const Landing: React.FC = () => {
           <motion.div {...fadeUp} className="rounded-xl p-7 space-y-3"
                       style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>About</p>
-            <h2 className="text-xl font-extrabold" style={{ color: 'var(--tx)' }}>Faculty of Computers &amp; Artificial Intelligence</h2>
+            <h2 className="text-xl font-extrabold" style={{ color: 'var(--tx)' }}>Faculty of Computer &amp; Artificial Intelligence</h2>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--tx2)' }}>
-              SkinSight is a graduation project demonstrating end-to-end AI application development —
+              SkinSight is a graduation project demonstrating end-to-end AI application development
               from training deep learning models to deploying a full-stack product across mobile and web.
             </p>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--tx2)' }}>
@@ -251,11 +236,11 @@ export const Landing: React.FC = () => {
             <div className="flex gap-2 pt-1 flex-wrap">
               <a href="https://github.com/Abdelrhman-Ahmed-XD/Skin-Disease-Detection-System" target="_blank" rel="noreferrer"
                  className="btn-ghost px-4 py-2 rounded-xl text-xs inline-flex items-center gap-1.5">
-                <GithubIcon size={13} />Mobile App
+                <GithubIcon size={13}/>Mobile App
               </a>
               <a href="https://github.com/Abdelrhman-Ahmed-XD/Skin-Disease-Detection-System-Web" target="_blank" rel="noreferrer"
                  className="btn-ghost px-4 py-2 rounded-xl text-xs inline-flex items-center gap-1.5">
-                <GithubIcon size={13} />Web App
+                <GithubIcon size={13}/>Web App
               </a>
             </div>
           </motion.div>
@@ -276,7 +261,7 @@ export const Landing: React.FC = () => {
               <Link to="/signup"
                     className="px-5 py-2.5 rounded-xl text-sm font-bold inline-flex items-center gap-1.5 transition-all hover:-translate-y-0.5"
                     style={{ background: '#070d1a', color: '#00e5ff' }}>
-                Create free account <ArrowRight size={13} />
+                Create free account <ArrowRight size={13}/>
               </Link>
               <button onClick={handleGuest}
                       className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5"
