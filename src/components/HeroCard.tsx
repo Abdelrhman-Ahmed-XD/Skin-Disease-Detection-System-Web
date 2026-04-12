@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// ── Phase configuration ─────────────────────────────────────────────────────
 type Phase = 'photo' | 'unet' | 'cnn' | 'score';
 const PHASES: Phase[] = ['photo', 'unet', 'cnn', 'score'];
 const DURATIONS: Record<Phase, number> = { photo: 3000, unet: 2800, cnn: 2800, score: 3800 };
@@ -125,38 +126,44 @@ export const HeroCard: React.FC = () => {
   const lesionOp  = phase === 'unet' ? 0.45 : phase === 'cnn' || phase === 'score' ? 0.3 : 1;
 
   return (
-      <div className="rounded-2xl overflow-hidden w-full"
+      <div className="rounded-2xl overflow-hidden w-full border transition-all duration-300"
            style={{
-             background: '#070d1a',
-             border: '1px solid rgba(0,229,255,0.15)',
-             boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+             background: 'var(--surface)',
+             borderColor: 'var(--br)',
+             boxShadow: '0 24px 64px rgba(0,0,0,0.1)',
            }}>
 
         {/* Window Chrome */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-3 border-b"
+             style={{
+               background: 'var(--bg2)',
+               borderColor: 'var(--br)'
+             }}>
           <div className="flex gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500/60"/>
             <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60"/>
             <div className="w-2.5 h-2.5 rounded-full bg-green-500/60"/>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">SkinSight Analysis</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 bg-cyan-500/10 text-[#00e5ff]">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-cyan-400"/>Live
+          <span className="text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: 'var(--tx2)' }}>SkinSight Analysis</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1"
+                style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent)' }}/>Live
         </span>
         </div>
 
         {/* Main Image Area (340px) */}
         <div className="relative mx-4 mt-4 rounded-xl overflow-hidden"
-             style={{ height: 340, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(0,229,255,0.08)' }}>
+             style={{ height: 340, background: 'rgba(0,0,0,0.6)', border: '1px solid var(--br)' }}>
 
-          {/* ── NEW: Dynamic Skin Background ── */}
+          {/* ── Dynamic Skin Background ── */}
           <AnimatePresence>
             {(phase === 'photo' || phase === 'unet') && (
                 <motion.div
                     key="skin-bg"
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: phase === 'photo' ? 1 : 0.15 }} // Fades 85% in UNet phase
-                    exit={{ opacity: 0 }} // Removed after UNet
+                    animate={{ opacity: phase === 'photo' ? 1 : 0.15 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.8 }}
                     className="absolute inset-0 z-0"
                     style={{
@@ -186,10 +193,7 @@ export const HeroCard: React.FC = () => {
             <div style={{ width: 220, height: 210 }}>
               <motion.div
                   style={{ width: '100%', height: '100%' }}
-                  animate={{
-                    opacity: lesionOp,
-                    scale: phase === 'photo' ? 0.95 : 1
-                  }}
+                  animate={{ opacity: lesionOp, scale: phase === 'photo' ? 0.95 : 1 }}
                   transition={{ duration: 0.7 }}>
                 <LesionSVG showSeg={showSeg}/>
               </motion.div>
@@ -202,7 +206,7 @@ export const HeroCard: React.FC = () => {
                 <motion.div key="cnn"
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px]">
-                  <p className="text-[9px] font-bold uppercase tracking-widest mb-2 text-cyan-400/60">Neural network layers</p>
+                  <p className="text-[9px] font-bold uppercase tracking-widest mb-2 text-[#00e5ff]/60">Neural network layers</p>
                   <CNNViz active={phase === 'cnn'}/>
                 </motion.div>
             )}
@@ -218,7 +222,7 @@ export const HeroCard: React.FC = () => {
                     <p className="text-3xl font-extrabold text-white">
                       <ScoreCounter active={phase === 'score'} target={94.5}/>
                     </p>
-                    <p className="text-[9px] uppercase tracking-widest mt-1 text-cyan-400/50">confidence</p>
+                    <p className="text-[9px] uppercase tracking-widest mt-1 text-[#00e5ff]/50">confidence</p>
                   </div>
                 </motion.div>
             )}
@@ -228,7 +232,12 @@ export const HeroCard: React.FC = () => {
           <div className="absolute bottom-4 left-0 right-0 flex justify-center z-30">
             <AnimatePresence mode="wait">
               <motion.div key={phase} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                          className="px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-lg">
+                          className="px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-lg border"
+                          style={{
+                            background: 'var(--accent-dim)',
+                            color: 'var(--accent)',
+                            borderColor: 'var(--accent-glow)'
+                          }}>
                 {LABEL[phase]}
               </motion.div>
             </AnimatePresence>
@@ -237,7 +246,7 @@ export const HeroCard: React.FC = () => {
           {/* Progress Dots */}
           <div className="absolute top-4 left-0 right-0 flex justify-center gap-1.5 z-30">
             {PHASES.map(p => (
-                <motion.div key={p} animate={{ width: phase === p ? 18 : 6, background: phase === p ? '#00e5ff' : 'rgba(0,229,255,0.2)' }}
+                <motion.div key={p} animate={{ width: phase === p ? 18 : 6, background: phase === p ? 'var(--accent)' : 'var(--br2)' }}
                             transition={{ duration: 0.3 }}
                             style={{ height: 5, borderRadius: 999 }}/>
             ))}
@@ -251,19 +260,24 @@ export const HeroCard: React.FC = () => {
                 <motion.div key="score" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <p className="text-[9px] uppercase tracking-widest font-bold text-white/40 mb-0.5">Detected condition</p>
-                      <p className="text-sm font-extrabold text-white font-sans">Melanocytic Nevus</p>
+                      <p className="text-[9px] uppercase tracking-widest font-bold mb-0.5"
+                         style={{ color: 'var(--tx3)' }}>Detected condition</p>
+                      <p className="text-sm font-extrabold" style={{ color: 'var(--tx)' }}>Melanocytic Nevus</p>
                     </div>
-                    <p className="text-xl font-extrabold"><ScoreCounter active={phase === 'score'} target={94.5}/></p>
+                    <p className="text-xl font-extrabold" style={{ color: 'var(--accent)' }}>
+                      <ScoreCounter active={phase === 'score'} target={94.5}/>
+                    </p>
                   </div>
-                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                    <motion.div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" initial={{ width: 0 }} animate={{ width: '94.5%' }} transition={{ duration: 1.3 }}/>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg2)' }}>
+                    <motion.div className="h-full rounded-full"
+                                style={{ background: 'linear-gradient(90deg, #00b4d8, var(--accent))' }}
+                                initial={{ width: 0 }} animate={{ width: '94.5%' }} transition={{ duration: 1.3 }}/>
                   </div>
                 </motion.div>
             ) : (
                 <motion.div key="placeholder" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                  <div className="h-4 w-2/3 rounded-md animate-pulse bg-white/5"/>
-                  <div className="h-1.5 rounded-full animate-pulse bg-white/5"/>
+                  <div className="h-4 w-2/3 rounded-md animate-pulse" style={{ background: 'var(--bg2)' }}/>
+                  <div className="h-1.5 rounded-full animate-pulse" style={{ background: 'var(--bg2)' }}/>
                 </motion.div>
             )}
           </AnimatePresence>
@@ -271,7 +285,12 @@ export const HeroCard: React.FC = () => {
           <div className="flex gap-2 flex-wrap">
             {[{ label: 'CNN Model', active: phase === 'cnn' || phase === 'score' }, { label: 'UNet Mask', active: showSeg }, { label: 'Saved', active: phase === 'score' }].map(({ label, active }) => (
                 <motion.span key={label} animate={{ opacity: active ? 1 : 0.25 }}
-                             className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-cyan-500/5 text-cyan-400/80 border border-cyan-500/10">
+                             className="px-2 py-0.5 rounded-md text-[10px] font-semibold border"
+                             style={{
+                               background: 'var(--accent-dim)',
+                               color: 'var(--accent)',
+                               borderColor: 'var(--br)'
+                             }}>
                   {label}
                 </motion.span>
             ))}

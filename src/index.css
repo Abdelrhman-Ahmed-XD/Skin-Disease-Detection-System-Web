@@ -3,20 +3,22 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 
+/* index.css */
 :root {
-  --bg:        #f6f8fc;
-  --bg2:       #eef1f7;
+  --bg:        #f8fafc; /* Slightly cleaner slate-50 */
+  --bg2:       #f1f5f9; /* Slate-100 */
   --surface:   #ffffff;
-  --surface2:  #f9fafc;
+  --surface2:  #f8fafc;
   --accent:    #0891b2;
   --accent-lt: #06b6d4;
-  --accent-dim:  rgba(8,145,178,0.10);
-  --accent-glow: rgba(8,145,178,0.22);
+  --accent-dim:  rgba(8,145,178,0.08);
+  --accent-glow: rgba(8,145,178,0.15);
   --tx:        #0f172a;
   --tx2:       #475569;
   --tx3:       #94a3b8;
-  --br:        rgba(15,23,42,0.07);
-  --br2:       rgba(15,23,42,0.14);
+  /* IMPROVED BORDERS FOR LIGHT MODE */
+  --br:        rgba(15,23,42,0.12); /* Increased from 0.07 to 0.12 */
+  --br2:       rgba(15,23,42,0.20); /* Increased from 0.14 to 0.20 */
   font-family: 'Inter', system-ui, sans-serif;
   color: var(--tx);
   background: var(--bg);
