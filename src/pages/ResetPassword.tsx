@@ -1,10 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle2, ArrowLeft, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import toast from 'react-hot-toast';
+
+// Same rules as Profile change-password and Signup
+const pwChecks = (pw: string) => [
+  { label: 'At least 8 characters',   pass: pw.length >= 8 },
+  { label: 'Uppercase letter',         pass: /[A-Z]/.test(pw) },
+  { label: 'Lowercase letter',         pass: /[a-z]/.test(pw) },
+  { label: 'A number',                 pass: /[0-9]/.test(pw) },
+  { label: 'Special character (!@#…)', pass: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw) },
+];
+const isPwValid = (pw: string) => pwChecks(pw).every(c => c.pass);
 
 type Step = 'otp' | 'newpw' | 'done';
 
@@ -21,13 +31,20 @@ export const ResetPassword: React.FC = () => {
   const storedEmail = sessionStorage.getItem('reset_email') || '';
   const storedOtp   = sessionStorage.getItem('reset_otp')   || '';
 
+  // Only check session on mount — prevents redirect when step changes
   useEffect(() => {
-    if (!storedEmail || !storedOtp) {
+    const email = sessionStorage.getItem('reset_email');
+    const otp   = sessionStorage.getItem('reset_otp');
+    if (!email || !otp) {
       toast.error('Session expired. Please request a new reset code.');
       navigate('/forgot-password');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (step === 'otp') inputsRef.current[0]?.focus();
-  }, [step, navigate, storedEmail, storedOtp]);
+  }, [step]);
 
   const handleOtpChange = (idx: number, val: string) => {
     if (!/^\d*$/.test(val)) return;
@@ -62,8 +79,8 @@ export const ResetPassword: React.FC = () => {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
-    if (password !== confirm) { toast.error('Passwords do not match'); return; }
+    if (!isPwValid(password)) { toast.error('Password does not meet all requirements'); return; }
+    if (password !== confirm)  { toast.error('Passwords do not match'); return; }
     setLoading(true);
     try {
       const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
@@ -165,12 +182,27 @@ export const ResetPassword: React.FC = () => {
                         <div className="relative">
                           <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color:'var(--tx3)' }} />
                           <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-                                 className="input-field pr-10" placeholder="Min. 6 characters" required minLength={6} />
+                                 className="input-field pr-10" placeholder="Min. 8 characters" required />
                           <button type="button" onClick={() => setShowPw(!showPw)}
                                   className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color:'var(--tx3)' }}>
                             {showPw ? <EyeOff size={15}/> : <Eye size={15}/>}
                           </button>
                         </div>
+                        {/* Live strength checklist */}
+                        {password.length > 0 && (
+                            <div className="mt-2.5 rounded-xl p-3 space-y-1.5"
+                                 style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                              {pwChecks(password).map(({ label, pass }) => (
+                                  <div key={label} className="flex items-center gap-2">
+                                    <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0"
+                                         style={{ background: pass ? '#22c55e' : 'var(--br2)' }}>
+                                      {pass && <Check size={8} color="#fff"/>}
+                                    </div>
+                                    <span className="text-xs" style={{ color: pass ? '#22c55e' : 'var(--tx3)' }}>{label}</span>
+                                  </div>
+                              ))}
+                            </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1.5" style={{ color:'var(--tx2)' }}>Confirm password</label>
@@ -180,7 +212,7 @@ export const ResetPassword: React.FC = () => {
                                  className="input-field" placeholder="Repeat password" required />
                         </div>
                       </div>
-                      <button type="submit" disabled={loading}
+                      <button type="submit" disabled={loading || !isPwValid(password) || password !== confirm}
                               className="btn-accent w-full py-3 rounded-xl text-sm flex items-center justify-center gap-2 mt-2 disabled:opacity-60">
                         {loading
                             ? <span className="spin w-4 h-4 border-2 border-current/30 border-t-current rounded-full"/>

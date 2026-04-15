@@ -120,11 +120,11 @@ const ScanModal: React.FC<{ scan: Scan; onClose: () => void; onDeleteClick: () =
                         </h3>
                         {scan.source === 'mobile' ? (
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] uppercase font-bold" style={{ background: 'var(--surface2)', color: 'var(--tx2)', border: '1px solid var(--br)' }}>
-                                <Smartphone size={10} /> App
+                                <Smartphone size={11} /> App
                             </span>
                         ) : scan.source === 'web' ? (
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] uppercase font-bold" style={{ background: 'var(--surface2)', color: 'var(--tx2)', border: '1px solid var(--br)' }}>
-                                <Monitor size={10} /> Web
+                                <Monitor size={11} /> Web
                             </span>
                         ) : null}
                     </div>
@@ -203,7 +203,15 @@ export const History: React.FC = () => {
         try {
             const q = query(collection(db, 'users', user.uid, 'scans'));
             const snap = await getDocs(q);
-            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Scan));
+            const docs = snap.docs.map(d => {
+                const data = d.data();
+                return {
+                    id: d.id,
+                    ...data,
+                    // Older mobile scans predate the source field — default them to 'mobile'
+                    source: data.source || 'mobile',
+                } as Scan;
+            });
             docs.sort((a, b) => toMs(b.createdAt || b.timestamp) - toMs(a.createdAt || a.timestamp));
             setScans(docs);
         } catch (e) { console.error(e); }
@@ -250,13 +258,35 @@ export const History: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.map((scan) => (
-                    <motion.div key={scan.id} className="rounded-2xl overflow-hidden card-hover cursor-pointer relative" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }} onClick={() => setSelected(scan)}>
+                    <motion.div key={scan.id} className="rounded-2xl overflow-hidden card-hover cursor-pointer group" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }} onClick={() => setSelected(scan)}>
                         <div className="h-44 relative overflow-hidden">
-                            <img src={scan.photoUri || scan.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-105" onError={(e) => { e.currentTarget.src = 'https://placehold.co/600x400/0f172a/00e5ff?text=Image+Unavailable'; }} />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/40"><ZoomIn size={18} style={{ color: '#00e5ff' }}/></div>
+                            <img src={scan.photoUri || scan.imageUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={(e) => { e.currentTarget.src = 'https://placehold.co/600x400/0f172a/00e5ff?text=Image+Unavailable'; }} />
+                            {/* Hover overlay */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.4)' }}>
+                                <ZoomIn size={22} style={{ color: '#00e5ff' }}/>
+                            </div>
+                            {/* Source badge — top left */}
+                            <div className="absolute top-2 left-2">
+                                {scan.source === 'mobile' ? (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] uppercase font-bold backdrop-blur-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>
+                                        <Smartphone size={10}/>
+                                    </span>
+                                ) : scan.source === 'web' ? (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] uppercase font-bold backdrop-blur-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#00e5ff', border: '1px solid rgba(0,229,255,0.3)' }}>
+                                        <Monitor size={10}/>
+                                    </span>
+                                ) : null}
+                            </div>
+                            {/* Confidence — top right */}
+                            {scan.confidence != null && scan.confidence > 0 && (
+                                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold backdrop-blur-sm"
+                                     style={{ background: 'rgba(0,0,0,0.65)', color: confidenceColor(scan.confidence) }}>
+                                    {typeof scan.confidence === 'number' ? scan.confidence.toFixed(1) : scan.confidence}%
+                                </div>
+                            )}
                         </div>
-                        <div className="p-4">
-                            <h3 className="font-bold truncate" style={{ color: 'var(--tx)' }}>{scan.analysis || 'Unknown'}</h3>
+                        <div className="p-4 space-y-1">
+                            <h3 className="font-bold truncate" style={{ color: 'var(--tx)' }}>{scan.analysis || scan.disease || 'Unknown condition'}</h3>
                             <p className="text-xs" style={{ color: 'var(--tx3)' }}>{formatDate(scan.createdAt || scan.timestamp)}</p>
                         </div>
                     </motion.div>

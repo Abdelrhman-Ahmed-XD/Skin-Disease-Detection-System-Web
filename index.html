@@ -5,12 +5,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SkinSight · AI Skin Disease Detection</title>
   <meta name="description" content="AI-powered skin disease detection using CNN and UNet deep learning models." />
+  <meta name="theme-color" content="#070d1a" />
+
+  <!-- Preconnect to external origins -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://res.cloudinary.com" />
+
+  <!-- Fonts: only load the weights actually used -->
+  <link rel="preload" as="style"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap"
+        media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" />
+  </noscript>
+
+  <!-- Inline critical CSS to unblock first paint -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html { font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #070d1a; color: #e2e8f0; }
+    #root { min-height: 100vh; }
+    /* Prevent layout shift while JS loads */
+    .app-shell { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .app-shell-spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid rgba(0,229,255,0.15);
+      border-top-color: #00e5ff;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
-<div id="root"></div>
+<!-- Shown immediately while JS bundle loads -->
+<div id="root">
+  <div class="app-shell">
+    <div class="app-shell-spinner"></div>
+  </div>
+</div>
 <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
