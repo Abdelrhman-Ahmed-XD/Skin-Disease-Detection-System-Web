@@ -91,7 +91,7 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
           exit={{ opacity: 0, y: 20 }}
       >
 
-        {/* 1. CAMERA VIEW AREA (Takes up all available space above the black box) */}
+        {/* 1. CAMERA VIEW AREA */}
         <div className="flex-1 relative w-full bg-[#111] overflow-hidden">
           {error ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
@@ -118,10 +118,10 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
               </div>
           )}
 
-          {/* User Tip Overlay (Hovers securely at the bottom of the camera feed) */}
+          {/* User Tip Overlay */}
           {!preview && !error && (
               <div className="absolute bottom-6 left-0 w-full flex justify-center pointer-events-none">
-                <div className="px-4 py-2 rounded-full bg-black/60 backdrop-blur-md flex items-center gap-2 border border-white/20">
+                <div className="px-4 py-2 rounded-full bg-black/60 backdrop-blur-md flex items-center gap-2 border border-white/20 shadow-lg">
                   <Lightbulb size={14} className="text-yellow-400" />
                   <span className="text-xs text-white font-medium">Tip: Use bright light and hold still</span>
                 </div>
@@ -129,27 +129,23 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
           )}
         </div>
 
-        {/* 2. THE BLACK BOX (Fixed height, matches your photo exactly) */}
+        {/* 2. THE BLACK BOX */}
         <div className="h-32 bg-black w-full flex-shrink-0 flex items-center justify-between px-8 pb-4">
           {!preview ? (
               <>
-                {/* Left: Close Button */}
                 <button onClick={onClose} className="w-12 h-12 flex items-center justify-center text-white rounded-full transition-colors active:bg-white/20">
                   <X size={28}/>
                 </button>
 
-                {/* Center: Classic White Shutter Button */}
                 <button onClick={capture} disabled={!!error} className="w-[72px] h-[72px] rounded-full border-[3px] border-white flex items-center justify-center disabled:opacity-40 transition-transform active:scale-95">
                   <div className="w-[58px] h-[58px] bg-white rounded-full" />
                 </button>
 
-                {/* Right: Flip Camera Button */}
                 <button onClick={flip} className="w-12 h-12 flex items-center justify-center text-white rounded-full transition-colors active:bg-white/20">
                   <RotateCcw size={26}/>
                 </button>
               </>
           ) : (
-              // Preview State (After taking photo)
               <div className="flex w-full gap-4 items-center justify-center px-4">
                 <button onClick={retake} className="flex-1 py-4 rounded-xl text-sm font-bold bg-white/10 text-white transition-colors active:bg-white/20">
                   Retake
