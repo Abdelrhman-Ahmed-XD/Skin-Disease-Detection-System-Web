@@ -46,7 +46,7 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
     try {
       if (stream) { stream.getTracks().forEach(t => t.stop()); }
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1080 }, height: { ideal: 1920 } },
+        video: { facingMode },
       });
       setStream(s);
       if (videoRef.current) videoRef.current.srcObject = s;
@@ -118,7 +118,7 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
           ) : preview ? (
               <img src={preview} className="absolute inset-0 w-full h-full object-cover" alt="Preview"/>
           ) : (
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover"/>
+              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain"/>
           )}
 
           {/* Animated scan line */}
