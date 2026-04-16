@@ -47,7 +47,7 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
       setError('');
     } catch (e: any) {
       setError(e.name === 'NotAllowedError'
-          ? 'Camera permission denied. Please allow camera access in your browser settings.'
+          ? 'Camera permission denied.'
           : 'Could not access camera. Try uploading an image instead.');
     }
   };
@@ -89,20 +89,19 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
           initial={{ opacity: 0, y: '20%' }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: '20%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       >
-        {/* Overlaid Top Bar */}
-        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-6 bg-gradient-to-b from-black/80 to-transparent">
-          <span className="text-xs font-bold tracking-widest uppercase shadow-black drop-shadow-md" style={{ color: 'var(--accent)' }}>
+        {/* Top Bar - Black */}
+        <div className="flex items-center justify-between px-6 py-4 bg-black flex-shrink-0">
+          <span className="text-sm font-bold tracking-widest uppercase" style={{ color: 'var(--accent)' }}>
             SkinSight Scanner
           </span>
-          <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-lg bg-white/10 text-white transition-colors hover:bg-white/20 shadow-lg">
+          <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 text-white transition-colors hover:bg-white/20">
             <X size={20}/>
           </button>
         </div>
 
-        {/* Full Screen Camera View */}
-        <div className="relative flex-1 bg-black overflow-hidden w-full h-full">
+        {/* Camera View - Strict 4:3 Aspect Ratio */}
+        <div className="relative w-full aspect-[4/3] max-w-2xl mx-auto bg-[#111] overflow-hidden flex-shrink-0 border-y border-white/10">
           {error ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
                 <AlertCircle size={40} color="#ef4444"/>
@@ -114,20 +113,16 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
               <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover"/>
           )}
 
-          {/* Target Reticle (Only shows when live) */}
+          {/* Target Reticle */}
           {!preview && !error && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                <div className="relative w-64 h-64">
+                <div className="relative w-48 h-48 sm:w-64 sm:h-64">
                   {['top-0 left-0', 'top-0 right-0 rotate-90', 'bottom-0 left-0 -rotate-90', 'bottom-0 right-0 rotate-180'].map((cls, i) => (
-                      <div key={i} className={`absolute ${cls} w-10 h-10`}>
+                      <div key={i} className={`absolute ${cls} w-8 h-8 sm:w-10 sm:h-10`}>
                         <svg viewBox="0 0 32 32" fill="none"><path d="M0 12 L0 0 L12 0" stroke="rgba(0,229,255,0.8)" strokeWidth="3"/></svg>
                       </div>
                   ))}
-                  {/* Center Dot */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[rgba(0,229,255,0.4)]" />
-                  <p className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-xs font-semibold whitespace-nowrap drop-shadow-md" style={{ color: 'rgba(255,255,255,0.9)' }}>
-                    Center lesion in frame
-                  </p>
                 </div>
               </div>
           )}
@@ -135,29 +130,28 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
 
         <canvas ref={canvasRef} className="hidden"/>
 
-        {/* Overlaid Bottom Controls */}
-        <div className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-12 pt-24 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col items-center justify-center">
+        {/* Bottom Bar - Black background for buttons */}
+        <div className="flex-1 bg-black flex flex-col items-center justify-center px-6 py-6">
           {!preview ? (
               <div className="flex items-center justify-between w-full max-w-xs mx-auto">
-                {/* Empty space for flex alignment */}
-                <div className="w-12 h-12" />
+                <div className="w-12 h-12" /> {/* Spacer */}
 
-                {/* Big Shutter Button */}
+                {/* Shutter Button */}
                 <button onClick={capture} disabled={!!error} className="relative w-20 h-20 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-40" style={{ background: 'rgba(0,229,255,0.15)', border: '2px solid rgba(0,229,255,0.6)' }}>
                   <div className="w-14 h-14 rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 20px rgba(0,229,255,0.5)' }}/>
                 </button>
 
                 {/* Flip Camera Button */}
-                <button onClick={flip} className="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-lg bg-white/10 text-white transition-colors hover:bg-white/20 shadow-lg">
+                <button onClick={flip} className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 text-white transition-colors hover:bg-white/20">
                   <RotateCcw size={20}/>
                 </button>
               </div>
           ) : (
-              <div className="flex flex-col w-full max-w-xs mx-auto gap-3">
-                <button onClick={confirm} className="w-full py-4 rounded-2xl text-base font-extrabold flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95" style={{ background: 'var(--accent)', color: '#070d1a' }}>
+              <div className="flex flex-col w-full max-w-xs mx-auto gap-4">
+                <button onClick={confirm} className="w-full py-4 rounded-2xl text-base font-extrabold flex items-center justify-center gap-2 transition-transform active:scale-95" style={{ background: 'var(--accent)', color: '#070d1a' }}>
                   <CheckCircle2 size={20}/> Analyze Photo
                 </button>
-                <button onClick={retake} className="w-full py-4 rounded-2xl text-sm font-bold backdrop-blur-lg bg-white/10 text-white transition-colors hover:bg-white/20 shadow-lg">
+                <button onClick={retake} className="w-full py-4 rounded-2xl text-sm font-bold bg-white/10 text-white transition-colors hover:bg-white/20">
                   Retake
                 </button>
               </div>

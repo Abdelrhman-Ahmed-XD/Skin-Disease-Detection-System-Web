@@ -376,10 +376,22 @@ export const Reports: React.FC = () => {
                         <ResponsiveContainer width="100%" height="100%">
                             {chartType === 'pie' ? (
                                 <PieChart>
-                                    <Pie data={chartData} cx="50%" cy="50%" innerRadius={55} outerRadius={95}
+                                    <Pie data={chartData} cx="50%" cy="50%" innerRadius={40} outerRadius={60}
                                          paddingAngle={4} dataKey="value"
-                                         label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                                         labelLine={false}>
+                                         label={({ cx, cy, midAngle, outerRadius, name, percent, fill }) => {
+                                             const RADIAN = Math.PI / 180;
+                                             const radius = outerRadius + 12;
+                                             // @ts-ignore
+                                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                             // @ts-ignore
+                                             const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                             return (
+                                                 <text x={x} y={y} fill={fill} fontSize="11" fontWeight="bold" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                                                     {`${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                                 </text>
+                                             );
+                                         }}
+                                         labelLine={{ stroke: 'var(--tx3)', strokeWidth: 1 }}>
                                         {chartData.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>)}
                                     </Pie>
                                     <Tooltip contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--br)', borderRadius: '12px', color: 'var(--tx)' }}/>
