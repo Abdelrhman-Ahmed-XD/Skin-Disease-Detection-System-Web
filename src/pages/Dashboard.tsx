@@ -90,7 +90,7 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: '20%' }}
       >
-        {/* Top Bar - Black */}
+        {/* Top Bar - Black, Compact */}
         <div className="flex items-center justify-between px-6 py-4 bg-black flex-shrink-0">
           <span className="text-sm font-bold tracking-widest uppercase" style={{ color: 'var(--accent)' }}>
             SkinSight Scanner
@@ -100,38 +100,40 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
           </button>
         </div>
 
-        {/* Camera View - Strict 4:3 Aspect Ratio */}
-        <div className="relative w-full aspect-[4/3] max-w-2xl mx-auto bg-[#111] overflow-hidden flex-shrink-0 border-y border-white/10">
-          {error ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                <AlertCircle size={40} color="#ef4444"/>
-                <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
-              </div>
-          ) : preview ? (
-              <img src={preview} className="absolute inset-0 w-full h-full object-cover" alt="Preview"/>
-          ) : (
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover"/>
-          )}
-
-          {/* Target Reticle */}
-          {!preview && !error && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                <div className="relative w-48 h-48 sm:w-64 sm:h-64">
-                  {['top-0 left-0', 'top-0 right-0 rotate-90', 'bottom-0 left-0 -rotate-90', 'bottom-0 right-0 rotate-180'].map((cls, i) => (
-                      <div key={i} className={`absolute ${cls} w-8 h-8 sm:w-10 sm:h-10`}>
-                        <svg viewBox="0 0 32 32" fill="none"><path d="M0 12 L0 0 L12 0" stroke="rgba(0,229,255,0.8)" strokeWidth="3"/></svg>
-                      </div>
-                  ))}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[rgba(0,229,255,0.4)]" />
+        {/* Camera Area - Takes up the middle, centers the 4:3 video */}
+        <div className="flex-1 w-full flex flex-col items-center justify-center overflow-hidden bg-black">
+          <div className="relative w-full aspect-[4/3] max-w-2xl bg-[#111] border-y border-white/10 shadow-2xl">
+            {error ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <AlertCircle size={40} color="#ef4444"/>
+                  <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
                 </div>
-              </div>
-          )}
+            ) : preview ? (
+                <img src={preview} className="absolute inset-0 w-full h-full object-cover" alt="Preview"/>
+            ) : (
+                <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover"/>
+            )}
+
+            {/* Target Reticle */}
+            {!preview && !error && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                  <div className="relative w-48 h-48 sm:w-64 sm:h-64">
+                    {['top-0 left-0', 'top-0 right-0 rotate-90', 'bottom-0 left-0 -rotate-90', 'bottom-0 right-0 rotate-180'].map((cls, i) => (
+                        <div key={i} className={`absolute ${cls} w-8 h-8 sm:w-10 sm:h-10`}>
+                          <svg viewBox="0 0 32 32" fill="none"><path d="M0 12 L0 0 L12 0" stroke="rgba(0,229,255,0.8)" strokeWidth="3"/></svg>
+                        </div>
+                    ))}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[rgba(0,229,255,0.4)]" />
+                  </div>
+                </div>
+            )}
+          </div>
         </div>
 
         <canvas ref={canvasRef} className="hidden"/>
 
-        {/* Bottom Bar - Black background for buttons */}
-        <div className="flex-1 bg-black flex flex-col items-center justify-center px-6 py-6">
+        {/* Bottom Bar - Fixed size, tightly hugs the buttons */}
+        <div className="flex-shrink-0 bg-black flex flex-col items-center justify-center px-6 pb-10 pt-4">
           {!preview ? (
               <div className="flex items-center justify-between w-full max-w-xs mx-auto">
                 <div className="w-12 h-12" /> {/* Spacer */}
@@ -187,7 +189,7 @@ export const Dashboard: React.FC = () => {
   const [confidenceDisplay, setConfidenceDisplay] = useState(0);
   const [showCamera, setShowCamera]   = useState(false);
   const [cameraSupported, setCameraSupported] = useState(false);
-  const [bodyView, setBodyView]       = useState('N/A'); // <--- ADDED BODY VIEW STATE
+  const [bodyView, setBodyView]       = useState('N/A');
 
   useEffect(() => {
     if (isGuest && localStorage.getItem('guest_scanned') === 'true') setHasScanned(true);
@@ -234,7 +236,7 @@ export const Dashboard: React.FC = () => {
           confidence:  prediction.confidence,
           description: prediction.description,
           createdAt:   serverTimestamp(),
-          bodyView:    bodyView, // <--- SAVING SELECTED DROPDOWN VALUE
+          bodyView:    bodyView,
           x: 0, y: 0,
           source:      'web',
         });
@@ -280,7 +282,7 @@ export const Dashboard: React.FC = () => {
             {!file && (
                 <motion.div key="drop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="p-6 sm:p-8 space-y-4">
 
-                  {/* NEW BODY LOCATION SELECTOR */}
+                  {/* BODY LOCATION SELECTOR */}
                   <div className="mb-4 text-left">
                     <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--tx2)' }}>Body Location (Optional)</label>
                     <select value={bodyView} onChange={e => setBodyView(e.target.value)}
@@ -340,8 +342,8 @@ export const Dashboard: React.FC = () => {
                         {result && !loading && (
                             <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
                               <div className="flex items-center gap-2 mb-1"><CheckCircle2 size={18} style={{ color: 'var(--accent)' }}/><h3 className="text-lg font-extrabold" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Analysis Result</h3></div>
-                              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--tx3)' }}>Detected condition</p><p className="text-xl font-extrabold" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{result.disease}</p></div>
-                              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                              <div className="rounded-xl p-4 w-full" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--tx3)' }}>Detected condition</p><p className="text-xl font-extrabold break-words" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{result.disease}</p></div>
+                              <div className="rounded-xl p-4 w-full" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center gap-1.5"><p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--tx3)' }}>Confidence score</p><div className="relative group"><Info size={12} style={{ color: 'var(--tx3)' }}/><div className="hidden group-hover:block absolute bottom-5 left-1/2 -translate-x-1/2 w-48 px-2.5 py-2 rounded-xl text-xs z-10" style={{ background: 'var(--surface)', border: '1px solid var(--br)', color: 'var(--tx2)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>How confident the CNN model is in its prediction. &ge;80% is high confidence.</div></div></div>
                                   <span className="text-lg font-extrabold" style={{ color: confColor(confidenceDisplay), fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{confidenceDisplay}%</span>
