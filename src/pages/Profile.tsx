@@ -32,21 +32,31 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
   return (await res.json()).secure_url;
 };
 
+// ── MATCHING DATA WITH MOBILE APP ──
+// Mobile saves Skin as HEX, but Eye and Hair as String Names. We added 'value' to sync properly.
 const SKIN_COLORS = [
-  { label: 'Very Light', color: '#F5E0D3' }, { label: 'Light',      color: '#EACAA7' },
-  { label: 'Medium',     color: '#D1A67A' }, { label: 'Tan',        color: '#B57D50' },
-  { label: 'Brown',      color: '#A05C38' }, { label: 'Dark Brown', color: '#8B4513' },
-  { label: 'Deep',       color: '#7A3E11' }, { label: 'Ebony',      color: '#603311' },
+  { title: 'Very Light', color: '#F5E0D3', value: '#F5E0D3' },
+  { title: 'Light',      color: '#EACAA7', value: '#EACAA7' },
+  { title: 'Medium',     color: '#D1A67A', value: '#D1A67A' },
+  { title: 'Tan',        color: '#B57D50', value: '#B57D50' },
+  { title: 'Brown',      color: '#A05C38', value: '#A05C38' },
+  { title: 'Dark Brown', color: '#8B4513', value: '#8B4513' },
+  { title: 'Deep',       color: '#7A3E11', value: '#7A3E11' },
+  { title: 'Ebony',      color: '#603311', value: '#603311' },
 ];
 const EYE_COLORS  = [
-  { name: 'Black', color: '#1a1a1a' }, { name: 'Brown', color: '#7B4B1A' },
-  { name: 'Light Blue', color: '#6EB6FF' }, { name: 'Light Green', color: '#6EDB8F' },
-  { name: 'Grey', color: '#9AA0A6' },
+  { title: 'Black', color: '#1a1a1a', value: 'Black' },
+  { title: 'Brown', color: '#7B4B1A', value: 'Brown' },
+  { title: 'Light Blue', color: '#6EB6FF', value: 'Light Blue' },
+  { title: 'Light Green', color: '#6EDB8F', value: 'Light Green' },
+  { title: 'Grey', color: '#9AA0A6', value: 'Grey' },
 ];
 const HAIR_COLORS = [
-  { name: 'Black', color: '#1a1a1a' }, { name: 'Brown', color: '#7B4B1A' },
-  { name: 'Blonde', color: '#D4A853' }, { name: 'Red', color: '#C0392B' },
-  { name: 'Grey', color: '#9AA0A6' },
+  { title: 'Black', color: '#1a1a1a', value: 'Black' },
+  { title: 'Brown', color: '#7B4B1A', value: 'Brown' },
+  { title: 'Blonde', color: '#D4A853', value: 'Blonde' },
+  { title: 'Red', color: '#C0392B', value: 'Red' },
+  { title: 'Grey', color: '#9AA0A6', value: 'Grey' },
 ];
 
 const pwChecks = (pw: string) => [
@@ -82,12 +92,13 @@ const Tip: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const ColorRow: React.FC<{ options: { color: string; name?: string; label?: string }[]; selected: string; onChange: (c: string) => void; }> = ({ options, selected, onChange }) => (
+// Updated ColorRow to properly use the specific "value" (Hex or Name)
+const ColorRow: React.FC<{ options: { color: string; title: string; value: string }[]; selected: string; onChange: (c: string) => void; }> = ({ options, selected, onChange }) => (
     <div className="flex flex-wrap gap-2 mt-2">
       {options.map(o => {
-        const isSelected = selected === o.color;
+        const isSelected = selected === o.value;
         return (
-            <button key={o.color} onClick={() => onChange(o.color)} title={o.name ?? o.label}
+            <button key={o.color} onClick={() => onChange(o.value)} title={o.title}
                     className="w-8 h-8 rounded-full transition-transform hover:scale-110 relative flex-shrink-0"
                     style={{ background: o.color, border: isSelected ? '2.5px solid var(--accent)' : '2px solid rgba(255,255,255,0.15)',
                       boxShadow: isSelected ? '0 0 0 3px rgba(0,229,255,0.25)' : 'none' }}>
@@ -223,7 +234,6 @@ export const Profile: React.FC = () => {
 
     setSavingPw(true);
 
-    // ── 🛡️ PREVENT REUSING OLD PASSWORD (INVISIBLE REST API CHECK) ──
     try {
       const apiKey = auth.app.options.apiKey;
 
@@ -236,7 +246,6 @@ export const Profile: React.FC = () => {
       const verifyData = await verifyRes.json();
 
       if (verifyRes.ok) {
-        // 🚨 200 OK means the new password they typed matches their active server password
         toast.error('Your new password cannot be the same as your current password.');
         setSavingPw(false);
         return;
@@ -249,7 +258,6 @@ export const Profile: React.FC = () => {
       console.log("Check skipped due to network error", err);
     }
 
-    // ── PROCEED TO UPDATE PASSWORD ON FIREBASE ──
     try {
       const cred = EmailAuthProvider.credential(user!.email!, curPw);
       await reauthenticateWithCredential(auth.currentUser!, cred);
@@ -272,7 +280,6 @@ export const Profile: React.FC = () => {
     try {
       const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
 
-      // 1. Check if email exists securely via YOUR FLASK BACKEND
       const checkRes = await fetch(`${flaskUrl}/api/check-email`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: newEmail.trim() })
       });
@@ -282,11 +289,9 @@ export const Profile: React.FC = () => {
         throw new Error('That email is already in use by another account');
       }
 
-      // 2. Re-authenticate user
       const cred = EmailAuthProvider.credential(user!.email!, emailPw);
       await reauthenticateWithCredential(auth.currentUser!, cred);
 
-      // 3. Send OTP
       const genOtp = generateOTP();
       setEmailServerOtp(genOtp);
       const res = await fetch(`${flaskUrl}/api/send-email-change-otp`, {
@@ -379,7 +384,7 @@ export const Profile: React.FC = () => {
     try { return new Date(raw).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
     catch { return '—'; }
   })();
-  const skinLabel = SKIN_COLORS.find(s => s.color === (userProfile?.skinColor || skinColor))?.label;
+  const skinLabel = SKIN_COLORS.find(s => s.value === (userProfile?.skinColor || skinColor))?.title;
 
   if (!userProfile && !isGuest) return <div className="flex items-center justify-center min-h-[60vh]"><div className="spin w-8 h-8 border-2 rounded-full" style={{ borderColor: 'var(--br2)', borderTopColor: 'var(--accent)' }}/></div>;
   if (isGuest) return (
@@ -457,11 +462,16 @@ export const Profile: React.FC = () => {
                   <div className="grid grid-cols-2 gap-3">{[ { label: 'First name', val: firstName, set: setFirstName, tip: 'Your first name as shown in reports.' }, { label: 'Last name', val: lastName, set: setLastName, tip: 'Your last name or family name.' } ].map(({ label, val, set, tip }) => ( <div key={label}><div className="flex items-center gap-1.5 mb-1.5"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>{label}</label><Tip text={tip}/></div><input type="text" value={val} onChange={e => set(e.target.value)} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--surface2)', border: '1px solid var(--br)', color: 'var(--tx)' }}/></div> ))}</div>
                   <div><div className="flex items-center gap-1.5 mb-2"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Gender</label><Tip text="Used in PDF reports and personalised health insights."/></div><div className="flex gap-2">{['male', 'female', 'other'].map(g => ( <button key={g} onClick={() => setGender(g)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all" style={{ background: gender === g ? 'var(--accent)' : 'var(--surface2)', color: gender === g ? '#070d1a' : 'var(--tx2)', border: `1px solid ${gender === g ? 'var(--accent)' : 'var(--br)'}` }}>{g}</button> ))}</div></div>
                   <div><div className="flex items-center gap-1.5 mb-2"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Date of birth</label><Tip text="Your age is used to calculate skin cancer risk levels in reports."/></div><div className="grid grid-cols-3 gap-2">{[ { label: 'Day', val: birthDay, set: setBirthDay, placeholder: 'DD' }, { label: 'Month', val: birthMonth, set: setBirthMonth, placeholder: 'MM' }, { label: 'Year', val: birthYear, set: setBirthYear, placeholder: 'YYYY' } ].map(({ label, val, set, placeholder }) => ( <div key={label}><p className="text-[10px] font-semibold mb-1" style={{ color: 'var(--tx3)' }}>{label}</p><input type="number" value={val} onChange={e => set(e.target.value)} placeholder={placeholder} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none text-center" style={{ background: 'var(--surface2)', border: '1px solid var(--br)', color: 'var(--tx)' }}/></div> ))}</div></div>
-                  <div><div className="flex items-center gap-1.5 mb-1"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Skin tone</label><Tip text="Helps calibrate AI confidence thresholds for your skin type."/></div><ColorRow options={SKIN_COLORS} selected={skinColor} onChange={setSkinColor}/>{skinColor && <p className="text-xs mt-1.5" style={{ color: 'var(--accent)' }}>{SKIN_COLORS.find(s => s.color === skinColor)?.label}</p>}</div>
+
+                  {/* Fixed Skin Color Display logic */}
+                  <div><div className="flex items-center gap-1.5 mb-1"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Skin tone</label><Tip text="Helps calibrate AI confidence thresholds for your skin type."/></div><ColorRow options={SKIN_COLORS} selected={skinColor} onChange={setSkinColor}/>{skinColor && <p className="text-xs mt-1.5" style={{ color: 'var(--accent)' }}>{SKIN_COLORS.find(s => s.value === skinColor)?.title}</p>}</div>
+
+                  {/* Fixed Eye Color Display logic */}
                   <div><div className="flex items-center gap-1.5 mb-1"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Eye colour</label><Tip text="Stored for full-report patient information."/></div><ColorRow options={EYE_COLORS} selected={eyeColor} onChange={setEyeColor}/></div>
+
+                  {/* Fixed Hair Color Display logic */}
                   <div><div className="flex items-center gap-1.5 mb-1"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Hair colour</label><Tip text="Included in the PDF patient information section."/></div><ColorRow options={HAIR_COLORS} selected={hairColor} onChange={setHairColor}/></div>
 
-                  {/* Fixed Button Layout for Edit Profile */}
                   <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
                     <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
                     <button onClick={saveEdit} disabled={savingEdit} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60">{savingEdit ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>}{savingEdit ? 'Saving…' : 'Save changes'}</button>
@@ -490,7 +500,6 @@ export const Profile: React.FC = () => {
                           ))}
                           {newPw.length > 0 && ( <div className="rounded-xl p-3 space-y-1.5" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--tx3)' }}>Requirements</p>{pwChecks(newPw).map(({ label, pass }) => ( <div key={label} className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: pass ? '#22c55e' : 'var(--br2)' }}>{pass && <Check size={8} color="#fff"/>}</div><span className="text-xs" style={{ color: pass ? '#22c55e' : 'var(--tx3)' }}>{label}</span></div> ))}</div> )}
 
-                          {/* Fixed Button Layout for Password Change */}
                           <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
                             <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
                             <button onClick={savePassword} disabled={savingPw || !curPw || !isPwValid(newPw) || newPw !== confirmPw} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">{savingPw ? <Loader2 size={14} className="animate-spin"/> : <Lock size={14}/>}{savingPw ? 'Saving…' : 'Change password'}</button>
@@ -528,7 +537,6 @@ export const Profile: React.FC = () => {
 
                           <form onSubmit={verifyEmailOtp} className="space-y-6">
 
-                            {/* Fixed Responsive Layout for OTP Input Boxes */}
                             <div className="flex items-center justify-center gap-1 sm:gap-3" onPaste={handleEmailPaste}>
                               {emailOtp.map((digit,i) => (
                                   <input key={i} ref={el => { emailInputsRef.current[i] = el; }}
@@ -587,7 +595,6 @@ export const Profile: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Fixed Responsive Layout for Email Change Buttons */}
                           <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
                             <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
                             <button onClick={requestChangeEmail} disabled={savingEmail || !newEmail || !emailPw} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">{savingEmail ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}{savingEmail ? 'Sending…' : 'Send verification code'}</button>
