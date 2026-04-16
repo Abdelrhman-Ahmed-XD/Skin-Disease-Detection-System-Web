@@ -35,6 +35,12 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
   const [captured, setCaptured] = useState<Blob | null>(null);
   const [facing, setFacing]     = useState<'user' | 'environment'>('environment');
   const [error, setError]       = useState('');
+  const [tipIdx, setTipIdx]     = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTipIdx(i => (i + 1) % TIPS.length), 4000);
+    return () => clearInterval(id);
+  }, []);
 
   const startCamera = async (facingMode: 'user' | 'environment') => {
     try {
@@ -85,18 +91,29 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
 
   return (
       <motion.div
-          className="fixed inset-0 z-[100] flex flex-col bg-black"
+          className="fixed inset-0 z-[100] flex flex-col"
+          style={{ background: 'var(--surface)' }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
       >
 
-        {/* 1. CAMERA VIEW AREA */}
-        <div className="flex-1 relative w-full bg-[#111] overflow-hidden">
+        {/* ── VIEWFINDER ── */}
+        <div className="flex-1 relative w-full overflow-hidden" style={{ background: '#060c10' }}>
+
+          {/* Subtle grid overlay */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage:
+                'repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(0,229,255,0.03) 39px,rgba(0,229,255,0.03) 40px),' +
+                'repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(0,229,255,0.03) 39px,rgba(0,229,255,0.03) 40px)',
+          }}/>
+
           {error ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                <AlertCircle size={40} color="#ef4444"/>
-                <p className="text-sm text-red-300">{error}</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                  <AlertCircle size={28} color="#ef4444"/>
+                </div>
+                <p className="text-sm font-medium" style={{ color: '#fca5a5' }}>{error}</p>
               </div>
           ) : preview ? (
               <img src={preview} className="absolute inset-0 w-full h-full object-cover" alt="Preview"/>
@@ -104,58 +121,170 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
               <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover"/>
           )}
 
-          {/* Target Reticle */}
+          {/* Animated scan line */}
           {!preview && !error && (
+              <div className="absolute left-0 right-0 h-[2px] pointer-events-none" style={{
+                background: 'linear-gradient(90deg,transparent 0%,rgba(0,229,255,0.5) 20%,rgba(0,229,255,0.9) 50%,rgba(0,229,255,0.5) 80%,transparent 100%)',
+                boxShadow: '0 0 10px rgba(0,229,255,0.35)',
+                animation: 'dermScan 3s ease-in-out infinite',
+              }}/>
+          )}
+
+          {/* Corner reticle */}
+          {!error && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="relative w-56 h-56 sm:w-72 sm:h-72 opacity-60">
-                  {['top-0 left-0', 'top-0 right-0 rotate-90', 'bottom-0 left-0 -rotate-90', 'bottom-0 right-0 rotate-180'].map((cls, i) => (
-                      <div key={i} className={`absolute ${cls} w-8 h-8`}>
-                        <svg viewBox="0 0 32 32" fill="none"><path d="M0 12 L0 0 L12 0" stroke="#fff" strokeWidth="3"/></svg>
+                <div className="relative" style={{ width: 210, height: 210 }}>
+
+                  {/* Corner brackets */}
+                  {[
+                    'top-0 left-0',
+                    'top-0 right-0 scale-x-[-1]',
+                    'bottom-0 left-0 scale-y-[-1]',
+                    'bottom-0 right-0 scale-[-1]',
+                  ].map((cls, i) => (
+                      <div key={i} className={`absolute ${cls}`} style={{ width: 26, height: 26 }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'var(--accent)', borderRadius: 1 }}/>
+                        <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 2, background: 'var(--accent)', borderRadius: 1 }}/>
                       </div>
                   ))}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white" />
+
+                  {/* Crosshair lines */}
+                  <div className="absolute" style={{ top: '50%', left: 20, right: 20, height: 1, background: 'rgba(0,229,255,0.2)', transform: 'translateY(-50%)' }}/>
+                  <div className="absolute" style={{ left: '50%', top: 20, bottom: 20, width: 1, background: 'rgba(0,229,255,0.2)', transform: 'translateX(-50%)' }}/>
+
+                  {/* Center dot */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{
+                    width: 7, height: 7,
+                    background: 'var(--accent)',
+                    boxShadow: '0 0 0 4px rgba(0,229,255,0.15), 0 0 0 8px rgba(0,229,255,0.07)',
+                  }}/>
                 </div>
               </div>
           )}
 
-          {/* User Tip Overlay */}
+          {/* Top HUD */}
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-4 pointer-events-none">
+            {/* Status badge */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold tracking-widest"
+                 style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,229,255,0.25)', color: 'var(--accent)' }}>
+              {!preview ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-red-500" style={{ animation: 'dermBlink 1.2s ease-in-out infinite' }}/>
+                    SCANNING
+                  </>
+              ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full" style={{ background: '#22c55e' }}/>
+                    CAPTURED
+                  </>
+              )}
+            </div>
+
+            {/* Close button — top right */}
+            <button
+                onClick={onClose}
+                className="pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', border: '1px solid var(--br2)', color: 'var(--tx2)' }}
+            >
+              <X size={16}/>
+            </button>
+          </div>
+
+          {/* Tip pill — bottom of viewfinder */}
           {!preview && !error && (
-              <div className="absolute bottom-6 left-0 w-full flex justify-center pointer-events-none">
-                <div className="px-4 py-2 rounded-full bg-black/60 backdrop-blur-md flex items-center gap-2 border border-white/20 shadow-lg">
-                  <Lightbulb size={14} className="text-yellow-400" />
-                  <span className="text-xs text-white font-medium">Tip: Use bright light and hold still</span>
-                </div>
+              <div className="absolute bottom-5 left-0 right-0 flex justify-center pointer-events-none px-4">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                      key={tipIdx}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.25 }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full text-xs"
+                      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,229,255,0.2)', color: 'var(--tx2)', maxWidth: '88%' }}
+                  >
+                    <Lightbulb size={12} style={{ color: 'var(--accent)', flexShrink: 0 }}/>
+                    <span>{TIPS[tipIdx].text}</span>
+                  </motion.div>
+                </AnimatePresence>
               </div>
           )}
         </div>
 
-        {/* 2. THE BLACK BOX */}
-        <div className="h-32 bg-black w-full flex-shrink-0 flex items-center justify-between px-8 pb-4">
+        {/* ── CONTROLS BAR ── */}
+        <div style={{ background: 'var(--surface2)', borderTop: '1px solid var(--br)' }} className="px-6 pt-4 pb-8 flex flex-col gap-4">
+
+          {/* Status line */}
+          <p className="text-center text-xs font-semibold tracking-widest" style={{ color: 'var(--tx3)', letterSpacing: '0.08em' }}>
+            {!preview
+                ? <><span style={{ color: 'var(--accent)' }}>■</span> AI SCANNER READY &nbsp;·&nbsp; CNN + UNET</>
+                : <><span style={{ color: '#22c55e' }}>✓</span> IMAGE READY FOR ANALYSIS</>
+            }
+          </p>
+
+          {/* Buttons */}
           {!preview ? (
-              <>
-                <button onClick={onClose} className="w-12 h-12 flex items-center justify-center text-white rounded-full transition-colors active:bg-white/20">
-                  <X size={28}/>
+              <div className="flex items-center justify-between">
+
+                {/* Placeholder left (keeps shutter centered) */}
+                <div style={{ width: 48 }}/>
+
+                {/* Shutter */}
+                <button
+                    onClick={capture}
+                    disabled={!!error}
+                    className="rounded-full flex items-center justify-center transition-transform active:scale-95 disabled:opacity-40"
+                    style={{ width: 72, height: 72, border: '2px solid var(--accent)', background: 'transparent' }}
+                >
+                  <div className="rounded-full" style={{ width: 56, height: 56, background: 'var(--accent)' }}/>
                 </button>
 
-                <button onClick={capture} disabled={!!error} className="w-[72px] h-[72px] rounded-full border-[3px] border-white flex items-center justify-center disabled:opacity-40 transition-transform active:scale-95">
-                  <div className="w-[58px] h-[58px] bg-white rounded-full" />
+                {/* Flip */}
+                <button
+                    onClick={flip}
+                    className="rounded-full flex items-center justify-center transition-colors"
+                    style={{ width: 48, height: 48, background: 'var(--surface)', border: '1px solid var(--br2)', color: 'var(--tx2)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--br2)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--tx2)'; }}
+                >
+                  <RotateCcw size={20}/>
                 </button>
-
-                <button onClick={flip} className="w-12 h-12 flex items-center justify-center text-white rounded-full transition-colors active:bg-white/20">
-                  <RotateCcw size={26}/>
-                </button>
-              </>
+              </div>
           ) : (
-              <div className="flex w-full gap-4 items-center justify-center px-4">
-                <button onClick={retake} className="flex-1 py-4 rounded-xl text-sm font-bold bg-white/10 text-white transition-colors active:bg-white/20">
-                  Retake
+              <div className="flex gap-3">
+                <button
+                    onClick={retake}
+                    className="flex-1 py-4 rounded-xl text-sm font-semibold transition-colors"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--br2)', color: 'var(--tx2)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--br2)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--tx2)'; }}
+                >
+                  ↩ Retake
                 </button>
-                <button onClick={confirm} className="flex-1 py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-transform active:scale-95" style={{ background: 'var(--accent)', color: '#070d1a' }}>
-                  <CheckCircle2 size={18}/> Analyze Photo
+                <button
+                    onClick={confirm}
+                    className="flex-1 py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-transform active:scale-98"
+                    style={{ background: 'var(--accent)', color: '#060c10' }}
+                >
+                  <CheckCircle2 size={17}/> Analyze Photo
                 </button>
               </div>
           )}
         </div>
+
+        {/* Keyframe styles injected once */}
+        <style>{`
+        @keyframes dermScan {
+          0%   { top: 15%; opacity: 0; }
+          8%   { opacity: 1; }
+          92%  { opacity: 1; }
+          100% { top: 85%; opacity: 0; }
+        }
+        @keyframes dermBlink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.25; }
+        }
+      `}</style>
 
         <canvas ref={canvasRef} className="hidden"/>
       </motion.div>
