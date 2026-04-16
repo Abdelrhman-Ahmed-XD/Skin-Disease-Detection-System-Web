@@ -400,7 +400,8 @@ export const Profile: React.FC = () => {
   return (
       <div className="max-w-2xl mx-auto space-y-5 pb-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <div className="rounded-2xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+          {/* Made main header card padding responsive */}
+          <div className="rounded-2xl p-4 sm:p-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
             <div className="flex items-center gap-5">
               <div className="relative flex-shrink-0">
                 {userProfile?.photoUri ? ( <img src={userProfile.photoUri} alt={fullName} className="w-20 h-20 rounded-2xl object-cover" style={{ border: '2px solid var(--accent)', boxShadow: '0 8px 24px var(--accent-glow)' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}/> ) : ( <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-extrabold" style={{ background: 'var(--accent)', color: '#070d1a', boxShadow: '0 8px 24px var(--accent-glow)' }}>{initials}</div> )}
@@ -425,14 +426,14 @@ export const Profile: React.FC = () => {
           <AnimatePresence mode="wait">
             {tab === 'profile' && (
                 <motion.div key="profile" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
-                  <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                  <div className="rounded-2xl p-4 sm:p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                     <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Account stats</p>
                     <div className="grid grid-cols-2 gap-3">
                       {[ { icon: Scan, label: 'Total scans', value: countLoading ? '…' : scanCount }, { icon: Calendar, label: 'Member since', value: joinDate }, { icon: Mail, label: 'Email', value: user?.email || '—' }, { icon: ShieldCheck, label: 'Account status', value: isVerified ? 'Verified ✓' : 'Not verified' } ].map(({ icon: Icon, label, value }) => ( <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><Icon size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>{label}</span></div><p className="text-sm font-semibold truncate" style={{ color: 'var(--tx)' }}>{String(value)}</p></div> ))}
                     </div>
                   </div>
                   {(userProfile?.gender || userProfile?.birthYear || userProfile?.skinColor) && (
-                      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                      <div className="rounded-2xl p-4 sm:p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                         <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Physical profile</p>
                         <div className="grid grid-cols-2 gap-3">
                           {userProfile.gender && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><UserIcon size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Gender</span></div><p className="text-sm font-semibold capitalize" style={{ color: 'var(--tx)' }}>{userProfile.gender}</p></div> )}
@@ -441,7 +442,7 @@ export const Profile: React.FC = () => {
                         </div>
                       </div>
                   )}
-                  <div className="rounded-2xl p-5 space-y-2" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                  <div className="rounded-2xl p-4 sm:p-5 space-y-2" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                     <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--accent)' }}>Actions</p>
                     <button onClick={() => setTab('edit')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Edit profile information <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button>
                     {isEmailProvider && ( <> <button onClick={() => setTab('password')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Change password <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button> <button onClick={() => setTab('email')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Change email address <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button> {!isVerified && ( <button onClick={sendVerification} disabled={sendingVerif} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'rgba(245,158,11,0.07)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}><span className="flex items-center gap-2">{sendingVerif ? <Loader2 size={14} className="animate-spin"/> : <Mail size={14}/>} Verify email address</span><ChevronRight size={15}/></button> )} </> )}
@@ -451,7 +452,7 @@ export const Profile: React.FC = () => {
             )}
 
             {tab === 'edit' && (
-                <motion.div key="edit" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-2xl p-6 space-y-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                <motion.div key="edit" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-2xl p-4 sm:p-6 space-y-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                   <div className="flex items-center gap-2"><p className="text-base font-extrabold" style={{ color: 'var(--tx)' }}>Edit Profile</p><Tip text="Changes sync to Firestore and are visible across web and mobile."/></div>
                   <div className="grid grid-cols-2 gap-3">{[ { label: 'First name', val: firstName, set: setFirstName, tip: 'Your first name as shown in reports.' }, { label: 'Last name', val: lastName, set: setLastName, tip: 'Your last name or family name.' } ].map(({ label, val, set, tip }) => ( <div key={label}><div className="flex items-center gap-1.5 mb-1.5"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>{label}</label><Tip text={tip}/></div><input type="text" value={val} onChange={e => set(e.target.value)} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--surface2)', border: '1px solid var(--br)', color: 'var(--tx)' }}/></div> ))}</div>
                   <div><div className="flex items-center gap-1.5 mb-2"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Gender</label><Tip text="Used in PDF reports and personalised health insights."/></div><div className="flex gap-2">{['male', 'female', 'other'].map(g => ( <button key={g} onClick={() => setGender(g)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all" style={{ background: gender === g ? 'var(--accent)' : 'var(--surface2)', color: gender === g ? '#070d1a' : 'var(--tx2)', border: `1px solid ${gender === g ? 'var(--accent)' : 'var(--br)'}` }}>{g}</button> ))}</div></div>
@@ -459,12 +460,17 @@ export const Profile: React.FC = () => {
                   <div><div className="flex items-center gap-1.5 mb-1"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Skin tone</label><Tip text="Helps calibrate AI confidence thresholds for your skin type."/></div><ColorRow options={SKIN_COLORS} selected={skinColor} onChange={setSkinColor}/>{skinColor && <p className="text-xs mt-1.5" style={{ color: 'var(--accent)' }}>{SKIN_COLORS.find(s => s.color === skinColor)?.label}</p>}</div>
                   <div><div className="flex items-center gap-1.5 mb-1"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Eye colour</label><Tip text="Stored for full-report patient information."/></div><ColorRow options={EYE_COLORS} selected={eyeColor} onChange={setEyeColor}/></div>
                   <div><div className="flex items-center gap-1.5 mb-1"><label className="text-xs font-semibold" style={{ color: 'var(--tx2)' }}>Hair colour</label><Tip text="Included in the PDF patient information section."/></div><ColorRow options={HAIR_COLORS} selected={hairColor} onChange={setHairColor}/></div>
-                  <div className="flex gap-3 pt-2"><button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button><button onClick={saveEdit} disabled={savingEdit} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60">{savingEdit ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>}{savingEdit ? 'Saving…' : 'Save changes'}</button></div>
+
+                  {/* Fixed Button Layout for Edit Profile */}
+                  <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                    <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
+                    <button onClick={saveEdit} disabled={savingEdit} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60">{savingEdit ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>}{savingEdit ? 'Saving…' : 'Save changes'}</button>
+                  </div>
                 </motion.div>
             )}
 
             {tab === 'password' && (
-                <motion.div key="password" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                <motion.div key="password" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-2xl p-4 sm:p-6 space-y-5" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                   <AnimatePresence mode="wait">
                     {pwDone ? (
                         <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8 space-y-4">
@@ -483,7 +489,12 @@ export const Profile: React.FC = () => {
                               </div>
                           ))}
                           {newPw.length > 0 && ( <div className="rounded-xl p-3 space-y-1.5" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--tx3)' }}>Requirements</p>{pwChecks(newPw).map(({ label, pass }) => ( <div key={label} className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: pass ? '#22c55e' : 'var(--br2)' }}>{pass && <Check size={8} color="#fff"/>}</div><span className="text-xs" style={{ color: pass ? '#22c55e' : 'var(--tx3)' }}>{label}</span></div> ))}</div> )}
-                          <div className="flex gap-3 pt-1"><button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button><button onClick={savePassword} disabled={savingPw || !curPw || !isPwValid(newPw) || newPw !== confirmPw} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">{savingPw ? <Loader2 size={14} className="animate-spin"/> : <Lock size={14}/>}{savingPw ? 'Saving…' : 'Change password'}</button></div>
+
+                          {/* Fixed Button Layout for Password Change */}
+                          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
+                            <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
+                            <button onClick={savePassword} disabled={savingPw || !curPw || !isPwValid(newPw) || newPw !== confirmPw} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">{savingPw ? <Loader2 size={14} className="animate-spin"/> : <Lock size={14}/>}{savingPw ? 'Saving…' : 'Change password'}</button>
+                          </div>
                         </motion.div>
                     )}
                   </AnimatePresence>
@@ -492,7 +503,7 @@ export const Profile: React.FC = () => {
 
             {/* ── CHANGE EMAIL ── */}
             {tab === 'email' && (
-                <motion.div key="email" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                <motion.div key="email" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-2xl p-4 sm:p-6 space-y-5" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                   <AnimatePresence mode="wait">
                     {emailSent ? (
                         <motion.div key="sent" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8 space-y-4">
@@ -516,13 +527,15 @@ export const Profile: React.FC = () => {
                           </div>
 
                           <form onSubmit={verifyEmailOtp} className="space-y-6">
-                            <div className="flex items-center justify-center gap-3" onPaste={handleEmailPaste}>
+
+                            {/* Fixed Responsive Layout for OTP Input Boxes */}
+                            <div className="flex items-center justify-center gap-1 sm:gap-3" onPaste={handleEmailPaste}>
                               {emailOtp.map((digit,i) => (
                                   <input key={i} ref={el => { emailInputsRef.current[i] = el; }}
                                          type="text" inputMode="numeric" maxLength={1} value={digit}
                                          onChange={e => handleEmailOtpChange(i, e.target.value)}
                                          onKeyDown={e => handleEmailOtpKeyDown(i, e)}
-                                         className={`w-14 h-16 text-center text-2xl font-bold rounded-xl outline-none transition-all duration-200 border-2 ${
+                                         className={`w-10 sm:w-14 h-14 sm:h-16 text-center text-xl sm:text-2xl font-bold rounded-xl outline-none transition-all duration-200 border-2 ${
                                              digit
                                                  ? 'border-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]'
                                                  : 'border-[var(--br)] hover:border-[var(--accent)] focus:border-[var(--accent)] hover:shadow-[0_0_10px_var(--accent-glow)] focus:shadow-[0_0_10px_var(--accent-glow)]'
@@ -532,7 +545,6 @@ export const Profile: React.FC = () => {
                               ))}
                             </div>
 
-                            {/* Timer & Resend Section */}
                             <div className="flex flex-col items-center justify-center mt-6">
                               {emailCanResend ? (
                                   <button type="button" onClick={handleResendEmailOtp} disabled={emailIsResending}
@@ -574,7 +586,12 @@ export const Profile: React.FC = () => {
                               <button type="button" onClick={() => setShowEmailPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--tx3)' }}>{showEmailPw ? <EyeOff size={15}/> : <Eye size={15}/>}</button>
                             </div>
                           </div>
-                          <div className="flex gap-3 pt-1"><button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button><button onClick={requestChangeEmail} disabled={savingEmail || !newEmail || !emailPw} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">{savingEmail ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}{savingEmail ? 'Sending…' : 'Send verification code'}</button></div>
+
+                          {/* Fixed Responsive Layout for Email Change Buttons */}
+                          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
+                            <button onClick={() => setTab('profile')} className="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
+                            <button onClick={requestChangeEmail} disabled={savingEmail || !newEmail || !emailPw} className="btn-accent flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">{savingEmail ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}{savingEmail ? 'Sending…' : 'Send verification code'}</button>
+                          </div>
                         </motion.div>
                     )}
                   </AnimatePresence>

@@ -87,7 +87,7 @@ export const ForgotPassword: React.FC = () => {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-md"
         >
-          <div className="rounded-2xl p-8" style={{ background: 'var(--surface)', border: '1px solid var(--br)', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
+          <div className="rounded-2xl p-5 sm:p-8" style={{ background: 'var(--surface)', border: '1px solid var(--br)', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
             <AnimatePresence mode="wait">
               {step === 'email' && (
                   <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

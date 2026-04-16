@@ -124,36 +124,23 @@ export const ResetPassword: React.FC = () => {
     if (password !== confirm)  { toast.error('Passwords do not match'); return; }
     setLoading(true);
 
-    // ── 🛡️ PREVENT REUSING OLD PASSWORD (INVISIBLE REST API CHECK) ──
+    // ── 🛡️ PREVENT REUSING OLD PASSWORD CHECK ──
     try {
-      // This grabs your Firebase API key automatically from your config
-      const apiKey = auth.app.options.apiKey;
-
-      const verifyRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: storedEmail, password: password, returnSecureToken: true })
-      });
-
-      const verifyData = await verifyRes.json();
-
-      if (verifyRes.ok) {
-        // 🚨 200 OK means the password they typed worked = IT IS THEIR CURRENT PASSWORD!
-        toast.error('Your new password cannot be the same as your current password.');
-        setLoading(false);
-        return;
-      } else if (verifyData.error?.message?.includes('TOO_MANY_ATTEMPTS')) {
+      await signInWithEmailAndPassword(auth, storedEmail, password);
+      // If it succeeds, they typed their CURRENT password!
+      await auth.signOut();
+      toast.error('Your new password cannot be the same as your current password.');
+      setLoading(false);
+      return;
+    } catch (err: any) {
+      if (err.code === 'auth/too-many-requests') {
         toast.error('Too many attempts. Please try again in a few minutes.');
         setLoading(false);
         return;
       }
-      // If it fails with "INVALID_LOGIN_CREDENTIALS", that's EXACTLY what we want!
-      // It means the password they typed is brand new.
-    } catch (err) {
-      console.log("Check skipped due to network error", err);
+      // 'auth/wrong-password' means the password is brand new, so we continue!
     }
 
-    // ── PROCEED TO UPDATE PASSWORD ON FLASK ──
     try {
       const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
       const res = await fetch(`${flaskUrl}/api/update-password`, {
@@ -195,7 +182,8 @@ export const ResetPassword: React.FC = () => {
             transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
             className="w-full max-w-md"
         >
-          <div className="rounded-2xl p-8" style={{ background:'var(--surface)', border:'1px solid var(--br)', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
+          {/* Apply responsive padding to the card from p-8 to p-5 sm:p-8 */}
+          <div className="rounded-2xl p-5 sm:p-8" style={{ background:'var(--surface)', border:'1px solid var(--br)', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
 
             <div className="flex items-center justify-center gap-2 mb-7">
               {stepOrder.map((s,i) => (
@@ -215,13 +203,14 @@ export const ResetPassword: React.FC = () => {
                     </div>
                     <form onSubmit={verifyOtp} className="space-y-6">
 
-                      <div className="flex items-center justify-center gap-3" onPaste={handlePaste}>
+                      {/* Apply responsive gap here: from gap-3 to gap-1 sm:gap-3 */}
+                      <div className="flex items-center justify-center gap-1 sm:gap-3" onPaste={handlePaste}>
                         {otp.map((digit,i) => (
                             <input key={i} ref={el => { inputsRef.current[i] = el; }}
                                    type="text" inputMode="numeric" maxLength={1} value={digit}
                                    onChange={e => handleOtpChange(i, e.target.value)}
                                    onKeyDown={e => handleOtpKeyDown(i, e)}
-                                   className={`w-14 h-16 text-center text-2xl font-bold rounded-xl outline-none transition-all duration-200 border-2 ${
+                                   className={`w-10 sm:w-14 h-16 text-center text-2xl font-bold rounded-xl outline-none transition-all duration-200 border-2 ${
                                        digit
                                            ? 'border-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]'
                                            : 'border-[var(--br)] hover:border-[var(--accent)] focus:border-[var(--accent)] hover:shadow-[0_0_10px_var(--accent-glow)] focus:shadow-[0_0_10px_var(--accent-glow)]'
