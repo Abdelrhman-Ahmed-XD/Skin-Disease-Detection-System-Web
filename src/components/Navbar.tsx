@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Moon, Sun, LogOut, Menu, X, Scan, History, BarChart2 } from 'lucide-react';
+import { Moon, Sun, LogOut, Menu, X, Scan, History, BarChart2, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Navbar: React.FC = () => {
@@ -151,7 +151,7 @@ export const Navbar: React.FC = () => {
                       <Link to="/profile" className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium"
                             style={{ color: isActive('/profile') ? 'var(--accent)' : 'var(--tx2)',
                               background: isActive('/profile') ? 'var(--accent-dim)' : 'transparent' }}>
-                        Profile
+                        <User size={14} />Profile
                       </Link>
                   )}
                   <div className="pt-2" style={{ borderTop: '1px solid var(--br)' }}>
