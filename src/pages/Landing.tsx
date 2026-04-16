@@ -90,7 +90,7 @@ export const Landing: React.FC = () => {
   const handleGuest = () => { if (!loggedIn) loginAsGuest(); navigate('/dashboard'); };
 
   const features = [
-    { icon: Brain,       title: 'CNN Classification', desc: 'Deep neural network trained on 10+ skin conditions classifies your photo with high accuracy.' },
+    { icon: Brain,       title: 'CNN Classification', desc: 'Deep neural network trained on 4 skin conditions classifies your photo with high accuracy.' },
     { icon: Eye,         title: 'UNet Segmentation',  desc: 'PyTorch UNet generates pixel-level masks that highlight exactly the affected skin region.' },
     { icon: Zap,         title: 'Instant Results',    desc: 'Upload an image and receive the disease name, confidence score, and full description in seconds.' },
     { icon: History,     title: 'Scan Timeline',      desc: 'Every scan is saved. Track how conditions evolve over time with your complete history.' },
@@ -98,10 +98,10 @@ export const Landing: React.FC = () => {
     { icon: Scan,        title: 'Mobile & Web',       desc: 'The same backend powers our React Native mobile app and this web platform seamlessly.' },
   ];
   const stats = [
-    { val: '10+', label: 'Conditions detected' },
+    { val: '4', label: 'Conditions detected' },
     { val: 'CNN', label: 'Classification model' },
     { val: 'UNet',label: 'Segmentation model' },
-    { val: '100%',label: 'Firebase secured' },
+    { val: 'Web & App', label: 'Cross-platform sync' },
   ];
 
   return (
@@ -130,7 +130,7 @@ export const Landing: React.FC = () => {
                 with AI.
               </h1>
               <p className="text-base leading-relaxed max-w-lg transition-colors duration-300" style={{ color: 'var(--tx2)' }}>
-                Upload a photo of your skin then SkinSight's CNN + UNet models analyze it, identify the condition,
+                Upload a photo of your skin then SkinSight's UNet + CNN models analyze it, identify the condition,
                 and generate a pixel-level segmentation map in seconds.
               </p>
               <div className="flex flex-wrap gap-3">
@@ -141,11 +141,6 @@ export const Landing: React.FC = () => {
                 <button onClick={handleGuest} className="btn-ghost px-5 py-2.5 rounded-xl text-sm">
                   Try as Guest
                 </button>
-                <a href="https://github.com/Abdelrhman-Ahmed-XD/Skin-Disease-Detection-System"
-                   target="_blank" rel="noreferrer"
-                   className="btn-ghost px-5 py-2.5 rounded-xl text-sm inline-flex items-center gap-2">
-                  <GithubIcon size={14}/> GitHub
-                </a>
               </div>
               <p className="text-xs leading-relaxed transition-colors duration-300" style={{ color: 'var(--tx3)' }}>
                 ⚠ Results are not a medical diagnosis. Consult a dermatologist for any concerning skin changes.
@@ -208,8 +203,8 @@ export const Landing: React.FC = () => {
             <div className="space-y-4">
               {[
                 { n: '01', title: 'Upload a photo',      desc: 'A close-up, well-lit photo of the affected skin area works best. Supports JPG and PNG.' },
-                { n: '02', title: 'AI runs the models',  desc: 'CNN classifier identifies the condition while UNet generates a segmentation overlay.' },
-                { n: '03', title: 'Review your results', desc: 'Get the disease name, confidence %, UNet mask, and a full description — all in seconds.' },
+                { n: '02', title: 'AI runs the models',  desc: 'UNet generates a segmentation overlay while CNN classifier identifies the condition.' },
+                { n: '03', title: 'Review your results', desc: 'Get the disease name, confidence %, UNet mask, and a full description all in seconds.' },
               ].map(({ n, title, desc }, i) => (
                   <motion.div key={n} {...fadeUp} transition={{ duration: 0.4, delay: i * 0.07 }}
                               className="relative rounded-xl p-5 card-hover transition-colors duration-300"
@@ -239,7 +234,7 @@ export const Landing: React.FC = () => {
               from training deep learning models to deploying a full-stack product across mobile and web.
             </p>
             <p className="text-xs leading-relaxed transition-colors duration-300" style={{ color: 'var(--tx2)' }}>
-              <strong style={{ color: 'var(--tx)' }}>Stack:</strong> React Native · React + Vite · Python Flask ·
+              <strong style={{ color: 'var(--tx)' }}>Stack:</strong> React Native(Expo) · React + Vite · Python Flask ·
               TensorFlow/Keras (CNN) · PyTorch (UNet) · Firebase · Cloudinary
             </p>
             <div className="flex gap-2 pt-1 flex-wrap">
