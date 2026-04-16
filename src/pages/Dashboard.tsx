@@ -40,7 +40,7 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
     try {
       if (stream) { stream.getTracks().forEach(t => t.stop()); }
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       setStream(s);
       if (videoRef.current) videoRef.current.srcObject = s;
@@ -84,60 +84,85 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
   };
 
   return (
-      <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  onClick={onClose}>
-        <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}/>
-        <motion.div className="relative w-full max-w-lg rounded-2xl overflow-hidden z-10"
-                    style={{ background: '#000', border: '1px solid rgba(0,229,255,0.2)' }}
-                    initial={{ scale: 0.93, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.93 }}
-                    onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <span className="text-sm font-bold" style={{ color: 'rgba(0,229,255,0.8)' }}>📷 Take a photo</span>
-            <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}>
-              <X size={14}/>
-            </button>
-          </div>
-          <div className="relative" style={{ aspectRatio: '4/3', background: '#111' }}>
-            {error ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                  <AlertCircle size={36} color="#ef4444"/>
-                  <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
+      <motion.div
+          className="fixed inset-0 z-[100] flex flex-col bg-black"
+          initial={{ opacity: 0, y: '20%' }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: '20%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      >
+        {/* Overlaid Top Bar */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-6 bg-gradient-to-b from-black/80 to-transparent">
+          <span className="text-xs font-bold tracking-widest uppercase shadow-black drop-shadow-md" style={{ color: 'var(--accent)' }}>
+            SkinSight Scanner
+          </span>
+          <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-lg bg-white/10 text-white transition-colors hover:bg-white/20 shadow-lg">
+            <X size={20}/>
+          </button>
+        </div>
+
+        {/* Full Screen Camera View */}
+        <div className="relative flex-1 bg-black overflow-hidden w-full h-full">
+          {error ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                <AlertCircle size={40} color="#ef4444"/>
+                <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
+              </div>
+          ) : preview ? (
+              <img src={preview} className="absolute inset-0 w-full h-full object-cover" alt="Preview"/>
+          ) : (
+              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover"/>
+          )}
+
+          {/* Target Reticle (Only shows when live) */}
+          {!preview && !error && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="relative w-64 h-64">
+                  {['top-0 left-0', 'top-0 right-0 rotate-90', 'bottom-0 left-0 -rotate-90', 'bottom-0 right-0 rotate-180'].map((cls, i) => (
+                      <div key={i} className={`absolute ${cls} w-10 h-10`}>
+                        <svg viewBox="0 0 32 32" fill="none"><path d="M0 12 L0 0 L12 0" stroke="rgba(0,229,255,0.8)" strokeWidth="3"/></svg>
+                      </div>
+                  ))}
+                  {/* Center Dot */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[rgba(0,229,255,0.4)]" />
+                  <p className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-xs font-semibold whitespace-nowrap drop-shadow-md" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                    Center lesion in frame
+                  </p>
                 </div>
-            ) : preview ? (
-                <img src={preview} className="w-full h-full object-cover" alt="Preview"/>
-            ) : (
-                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"/>
-            )}
-            {!preview && !error && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="relative w-56 h-56">
-                    {['top-0 left-0', 'top-0 right-0 rotate-90', 'bottom-0 left-0 -rotate-90', 'bottom-0 right-0 rotate-180'].map((cls, i) => (
-                        <div key={i} className={`absolute ${cls} w-8 h-8`}>
-                          <svg viewBox="0 0 32 32" fill="none"><path d="M0 12 L0 0 L12 0" stroke="rgba(0,229,255,0.8)" strokeWidth="2.5"/></svg>
-                        </div>
-                    ))}
-                    <p className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs whitespace-nowrap" style={{ color: 'rgba(0,229,255,0.6)' }}>Position lesion in frame</p>
-                  </div>
-                </div>
-            )}
-          </div>
-          <canvas ref={canvasRef} className="hidden"/>
-          <div className="flex items-center justify-between px-6 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            {!preview ? (
-                <>
-                  <button onClick={flip} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}><RotateCcw size={18}/></button>
-                  <button onClick={capture} disabled={!!error} className="w-16 h-16 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40" style={{ background: 'rgba(0,229,255,0.9)', boxShadow: '0 0 24px rgba(0,229,255,0.4)' }}><div className="w-12 h-12 rounded-full border-2 border-[#070d1a]"/></button>
-                  <div className="w-10"/>
-                </>
-            ) : (
-                <>
-                  <button onClick={retake} className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}>Retake</button>
-                  <button onClick={confirm} className="px-5 py-2 rounded-xl text-sm font-bold" style={{ background: '#00e5ff', color: '#070d1a' }}>Use this photo ✓</button>
-                </>
-            )}
-          </div>
-        </motion.div>
+              </div>
+          )}
+        </div>
+
+        <canvas ref={canvasRef} className="hidden"/>
+
+        {/* Overlaid Bottom Controls */}
+        <div className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-12 pt-24 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col items-center justify-center">
+          {!preview ? (
+              <div className="flex items-center justify-between w-full max-w-xs mx-auto">
+                {/* Empty space for flex alignment */}
+                <div className="w-12 h-12" />
+
+                {/* Big Shutter Button */}
+                <button onClick={capture} disabled={!!error} className="relative w-20 h-20 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-40" style={{ background: 'rgba(0,229,255,0.15)', border: '2px solid rgba(0,229,255,0.6)' }}>
+                  <div className="w-14 h-14 rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 20px rgba(0,229,255,0.5)' }}/>
+                </button>
+
+                {/* Flip Camera Button */}
+                <button onClick={flip} className="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-lg bg-white/10 text-white transition-colors hover:bg-white/20 shadow-lg">
+                  <RotateCcw size={20}/>
+                </button>
+              </div>
+          ) : (
+              <div className="flex flex-col w-full max-w-xs mx-auto gap-3">
+                <button onClick={confirm} className="w-full py-4 rounded-2xl text-base font-extrabold flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95" style={{ background: 'var(--accent)', color: '#070d1a' }}>
+                  <CheckCircle2 size={20}/> Analyze Photo
+                </button>
+                <button onClick={retake} className="w-full py-4 rounded-2xl text-sm font-bold backdrop-blur-lg bg-white/10 text-white transition-colors hover:bg-white/20 shadow-lg">
+                  Retake
+                </button>
+              </div>
+          )}
+        </div>
       </motion.div>
   );
 };
