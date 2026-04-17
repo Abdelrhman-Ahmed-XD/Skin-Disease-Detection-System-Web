@@ -296,7 +296,13 @@ export const Profile: React.FC = () => {
       setEmailServerOtp(genOtp);
       const res = await fetch(`${flaskUrl}/api/send-email-change-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newEmail.trim(), name: userProfile?.firstName || 'User', otp_code: genOtp, source: 'web' })
+        body: JSON.stringify({
+          email: newEmail.trim(),
+          name: userProfile?.firstName || 'User',
+          uid: user?.uid, // <--- ADDED UID FOR BACKEND TO FIND REAL NAME
+          otp_code: genOtp,
+          source: 'web'
+        })
       });
       if (!res.ok) throw new Error('Failed to send verification code');
 
@@ -317,7 +323,13 @@ export const Profile: React.FC = () => {
       setEmailServerOtp(genOtp);
       const res = await fetch(`${flaskUrl}/api/send-email-change-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newEmail.trim(), name: userProfile?.firstName || 'User', otp_code: genOtp, source: 'web' })
+        body: JSON.stringify({
+          email: newEmail.trim(),
+          name: userProfile?.firstName || 'User',
+          uid: user?.uid, // <--- ADDED UID HERE AS WELL
+          otp_code: genOtp,
+          source: 'web'
+        })
       });
       if (!res.ok) throw new Error('Failed to resend verification code');
 

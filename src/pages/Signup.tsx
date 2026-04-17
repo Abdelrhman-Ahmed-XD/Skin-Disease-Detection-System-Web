@@ -280,16 +280,16 @@ export const Signup: React.FC = () => {
                     </div>
 
                     <form onSubmit={verifyOtpAndCreateAccount} className="space-y-6">
-                      <div className="flex items-center justify-center gap-3" onPaste={handlePaste}>
+                      <div className="flex items-center justify-center gap-1.5 sm:gap-3" onPaste={handlePaste}>
                         {otp.map((digit,i) => (
                             <input key={i} ref={el => { inputsRef.current[i] = el; }}
                                    type="text" inputMode="numeric" maxLength={1} value={digit}
                                    onChange={e => handleOtpChange(i, e.target.value)}
                                    onKeyDown={e => handleOtpKeyDown(i, e)}
-                                   className={`w-14 h-16 text-center text-2xl font-bold rounded-xl outline-none transition-all duration-200 border-2 ${
+                                   className={`w-10 h-12 sm:w-14 sm:h-16 text-center text-xl sm:text-2xl font-bold rounded-lg sm:rounded-xl outline-none transition-all duration-200 border-2 ${
                                        digit
-                                           ? 'border-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]'
-                                           : 'border-[var(--br)] hover:border-[var(--accent)] focus:border-[var(--accent)] hover:shadow-[0_0_10px_var(--accent-glow)] focus:shadow-[0_0_10px_var(--accent-glow)]'
+                                           ? 'border-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]'
+                                           : 'border-[var(--br)] hover:border-[var(--accent)] focus:border-[var(--accent)] hover:shadow-[0_0_8px_var(--accent-glow)] focus:shadow-[0_0_8px_var(--accent-glow)]'
                                    }`}
                                    style={{ background: 'var(--surface2)', color: 'var(--tx)' }}
                             />
