@@ -47,13 +47,27 @@ export const Login: React.FC = () => {
           <div className="rounded-2xl p-8" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
             {/* Header */}
             <div className="text-center mb-7">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                   style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26C17.81 13.47 19 11.38 19 9c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.8" fill="none"/>
-                  <circle cx="12" cy="9" r="2.5" fill="currentColor" opacity="0.7"/>
-                </svg>
+
+              {/* ===================== LOGO — ONLY THIS SECTION CHANGED ===================== */}
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  background: '#cce9f3',
+                  border: '2.5px solid #4ec9d8',
+                  overflow: 'hidden',
+                  margin: '0 auto 1rem',
+                }}
+              >
+                <img
+                  src="/sign.png"
+                  alt="Skinsight Logo"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
               </div>
+              {/* ===================== END LOGO ===================== */}
+
               <h1 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Welcome back</h1>
               <p className="text-sm mt-1.5" style={{ color: 'var(--tx2)' }}>
                 Don't have an account?{' '}
