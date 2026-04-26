@@ -41,24 +41,61 @@ export const Navbar: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-[66px] items-center justify-between">
 
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg text-white transition-all group-hover:scale-105"
-                   style={{ background: 'var(--accent)', boxShadow: '0 0 16px var(--accent-glow)' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26C17.81 13.47 19 11.38 19 9c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.8" fill="none"/>
-                  <circle cx="12" cy="9" r="2.5" fill="currentColor" opacity="0.8"/>
-                </svg>
+            {/* ===================== LOGO — ONLY THIS SECTION CHANGED ===================== */}
+            <Link to="/" className="flex items-center gap-3 group">
+              {/* Circular container matching the screenshot: light-blue bg + teal border */}
+              <div
+                className="relative flex-shrink-0 transition-transform duration-200 group-hover:scale-105"
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: '#cce9f3',
+                  border: '2.5px solid #4ec9d8',
+                  overflow: 'hidden',
+                }}
+              >
+                <img
+                  src="/sign.png"
+                  alt="Skinsight Logo"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    /* Keep the image as-is in both modes — no invert */
+                  }}
+                />
               </div>
-              <div>
-              <span className="block text-base font-bold tracking-tight"
-                    style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--tx)' }}>
-                Skin<span style={{ color: 'var(--accent)' }}>Sight</span>
-              </span>
-                <span className="block text-[9px] font-semibold uppercase tracking-[0.2em]"
-                      style={{ color: 'var(--tx3)' }}>AI Detection</span>
+
+              {/* Text block */}
+              <div className="flex flex-col leading-tight">
+                <span
+                  style={{
+                    fontFamily: "'Georgia', 'Times New Roman', serif",
+                    fontSize: '1.45rem',
+                    letterSpacing: '0.06em',
+                    color: theme === 'dark' ? '#ffffff' : '#1a1a2e',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  <span style={{ color: '#3ab4cc', fontWeight: 700 }}>S</span>kinsight
+                </span>
+                <span
+                  style={{
+                    fontFamily: "'Georgia', 'Times New Roman', serif",
+                    fontSize: '0.68rem',
+                    fontStyle: 'italic',
+                    letterSpacing: '0.04em',
+                    color: theme === 'dark' ? '#9ab' : '#555',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Snap.Detect.Protect
+                </span>
               </div>
             </Link>
+            {/* ===================== END LOGO ===================== */}
 
             {/* Desktop links */}
             <div className="hidden items-center gap-1 md:flex">
