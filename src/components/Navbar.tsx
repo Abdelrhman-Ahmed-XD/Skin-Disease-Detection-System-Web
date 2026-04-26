@@ -56,7 +56,7 @@ export const Navbar: React.FC = () => {
                 }}
               >
                 <img
-                  src="/sign.png"
+                  src="/logo.png"
                   alt="Skinsight Logo"
                   style={{
                     width: '100%',

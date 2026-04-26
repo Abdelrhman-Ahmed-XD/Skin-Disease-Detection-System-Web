@@ -185,27 +185,10 @@ export const Signup: React.FC = () => {
               {step === 'form' && (
                   <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
                     <div className="text-center mb-7">
-
-                      {/* ===================== LOGO — ONLY THIS SECTION CHANGED ===================== */}
-                      <div
-                        style={{
-                          width: '56px',
-                          height: '56px',
-                          borderRadius: '50%',
-                          background: '#cce9f3',
-                          border: '2.5px solid #4ec9d8',
-                          overflow: 'hidden',
-                          margin: '0 auto 1rem',
-                        }}
-                      >
-                        <img
-                          src="/sign.png"
-                          alt="Skinsight Logo"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        />
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                           style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                        <UserPlus size={22}/>
                       </div>
-                      {/* ===================== END LOGO ===================== */}
-
                       <h1 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Create your account</h1>
                       <p className="text-sm mt-1.5" style={{ color: 'var(--tx2)' }}>
                         Already have one? <Link to="/login" className="font-semibold hover:underline" style={{ color: 'var(--accent)' }}>Sign in</Link>
