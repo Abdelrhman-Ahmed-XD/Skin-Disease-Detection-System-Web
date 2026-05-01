@@ -3,7 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UploadCloud, X, CheckCircle2, ChevronRight, AlertCircle,
-  ImageIcon, Camera, RotateCcw, Info, Lightbulb,
+  ImageIcon, Camera, RotateCcw, Lightbulb, Info, Scan, Activity, ShieldCheck, ShieldAlert, BookOpen
 } from 'lucide-react';
 import { uploadImage } from '../services/cloudinary';
 import { predictSkinDisease } from '../services/api';
@@ -14,16 +14,16 @@ import toast from 'react-hot-toast';
 
 const processingSteps = [
   'Uploading image to Cloudinary…',
-  'Running CNN classifier…',
   'Generating UNet segmentation mask…',
+  'Running CNN classifier…',
   'Preparing your results…',
 ];
 
 const TIPS = [
-  { icon: '💡', text: 'Use natural daylight or a bright white lamp — avoid flash glare.' },
+  { icon: '💡', text: 'Use natural daylight or a bright white lamp and avoid flash glare.' },
   { icon: '🔍', text: 'Get within 10–15 cm of the lesion so it fills at least half the frame.' },
-  { icon: '📐', text: 'Hold the camera steady and parallel to the skin — avoid angles.' },
-  { icon: '🧴', text: 'Clean the area first; remove any cream, makeup, or hair covering the spot.' },
+  { icon: '📐', text: 'Hold the camera steady and parallel to the skin and avoid angles.' },
+  { icon: '🧴', text: 'Clean the area first, remove any cream, makeup, or hair covering the spot.' },
   { icon: '🖤', text: 'For dark skin tones, extra light helps the model read colour variations.' },
 ];
 
@@ -343,30 +343,40 @@ export const Dashboard: React.FC = () => {
     return () => clearInterval(iv);
   }, [result]);
 
-  const analyzeFile = useCallback(async (selectedFile: File) => {
+  const analyzeFile = useCallback(async (selectedFile: File, photoType: 'phone' | 'dermo') => {
     if (isGuest && hasScanned) { toast.error('Guest limit reached. Create a free account to scan more.'); return; }
     setLoading(true); setResult(null); setStepIdx(0);
     try {
       const imageUrl = await uploadImage(selectedFile);
       let prediction;
       try {
-        prediction = await predictSkinDisease({ imageUrl });
+        prediction = await predictSkinDisease({ imageUrl, photoType });
       } catch {
-        prediction = { disease: 'Pending AI Analysis', confidence: 0, description: 'The AI backend is currently offline. Your image was saved and will be available in History.', suggestions: ['Check back when the AI backend is online.'], };
+        prediction = { status: 'unknown', disease: 'Pending AI Analysis', confidence: 0, description: 'The AI backend is currently offline. Your image was saved and will be available in History.', tips: [], precautions: [], sources: [], segmented_url: null, message: 'Backend Offline' };
       }
       setResult(prediction);
       if (isGuest) { localStorage.setItem('guest_scanned', 'true'); setHasScanned(true); }
+
+      // ── 🔥 NEW: Saving with Nested 'result' Structure 🔥 ──
       if (user) {
         await addDoc(collection(db, 'users', user.uid, 'scans'), {
           userId:      user.uid,
           photoUri:    imageUrl,
-          analysis:    prediction.disease,
-          confidence:  prediction.confidence,
-          description: prediction.description,
           createdAt:   serverTimestamp(),
           bodyView:    bodyView,
-          x: 0, y: 0,
+          x: 0,
+          y: 0,
           source:      'web',
+          result: {
+            segmentedUrl: prediction.segmented_url || null,
+            status:      prediction.status,
+            disease:     prediction.disease,
+            confidence:  prediction.confidence,
+            description: prediction.description || '',
+            tips:        prediction.tips || [],
+            precautions: prediction.precautions || [],
+            sources:     prediction.sources || [],
+          }
         });
       }
       toast.success('Analysis complete!');
@@ -379,12 +389,12 @@ export const Dashboard: React.FC = () => {
     if (!files.length) return;
     const f = files[0];
     setFile(f); setPreview(URL.createObjectURL(f)); setResult(null);
-    void analyzeFile(f);
+    void analyzeFile(f, 'dermo');
   }, [analyzeFile]);
 
   const handleCapture = (f: File) => {
     setShowCamera(false); setFile(f); setPreview(URL.createObjectURL(f)); setResult(null);
-    void analyzeFile(f);
+    void analyzeFile(f, 'phone');
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 });
@@ -440,7 +450,11 @@ export const Dashboard: React.FC = () => {
 
             {file && (
                 <motion.div key="preview" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-6 sm:p-8">
+
+                  {/* ── TOP SECTION: Image & Primary Results (Side by Side) ── */}
                   <div className="flex flex-col md:flex-row gap-6 items-start">
+
+                    {/* LEFT COLUMN: Uploaded Image */}
                     <div className="w-full md:w-2/5 flex-shrink-0">
                       <div className="relative rounded-2xl overflow-hidden aspect-square" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
                         <img src={preview!} alt="Skin scan" className="w-full h-full object-cover"/>
@@ -450,8 +464,11 @@ export const Dashboard: React.FC = () => {
                       <p className="text-xs mt-2 truncate text-center" style={{ color: 'var(--tx3)' }}><ImageIcon size={11} className="inline mr-1"/>{file.name}</p>
                     </div>
 
-                    <div className="flex-1 min-w-0">
+                    {/* RIGHT COLUMN: Analysis Status & Segmented Mask */}
+                    <div className="flex-1 min-w-0 w-full">
                       <AnimatePresence mode="wait">
+
+                        {/* Loading State */}
                         {loading && (
                             <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                               <p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>Analyzing your image…</p>
@@ -467,25 +484,220 @@ export const Dashboard: React.FC = () => {
                               </div>
                             </motion.div>
                         )}
+
+                        {/* Top Row Results */}
                         {result && !loading && (
-                            <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-                              <div className="flex items-center gap-2 mb-1"><CheckCircle2 size={18} style={{ color: 'var(--accent)' }}/><h3 className="text-lg font-extrabold" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Analysis Result</h3></div>
-                              <div className="rounded-xl p-4 w-full" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--tx3)' }}>Detected condition</p><p className="text-xl font-extrabold break-words" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{result.disease}</p></div>
-                              <div className="rounded-xl p-4 w-full" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-1.5"><p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--tx3)' }}>Confidence score</p><div className="relative group"><Info size={12} style={{ color: 'var(--tx3)' }}/><div className="hidden group-hover:block absolute bottom-5 left-1/2 -translate-x-1/2 w-48 px-2.5 py-2 rounded-xl text-xs z-10" style={{ background: 'var(--surface)', border: '1px solid var(--br)', color: 'var(--tx2)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>How confident the CNN model is in its prediction. &ge;80% is high confidence.</div></div></div>
-                                  <span className="text-lg font-extrabold" style={{ color: confColor(confidenceDisplay), fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{confidenceDisplay}%</span>
-                                </div>
-                                <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--br2)' }}><motion.div className="h-full rounded-full" style={{ background: `linear-gradient(90deg, ${confColor(result.confidence)}77, ${confColor(result.confidence)})`, width: `${confidenceDisplay}%` }}/></div>
-                              </div>
-                              {result.description && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--tx3)' }}>Description</p><p className="text-sm leading-relaxed" style={{ color: 'var(--tx2)' }}>{result.description}</p></div> )}
-                              {result.suggestions?.length > 0 && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--tx3)' }}>Recommendations</p><ul className="space-y-1.5">{result.suggestions.map((s: string, i: number) => ( <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'var(--tx2)' }}><ChevronRight size={14} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}/>{s}</li> ))}</ul></div> )}
-                              <button onClick={reset} className="btn-ghost w-full py-2.5 rounded-xl text-sm mt-2">↩ Scan another image</button>
+                            <motion.div key="result-top" variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }} initial="hidden" animate="show" className="space-y-4">
+
+                              {/* Reject States (Red) */}
+                              {(result.status === 'no_lesion' || result.status === 'bad_photo') && (
+                                  <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className="rounded-2xl p-6 border border-red-500/30 bg-red-500/10 flex flex-col items-center text-center">
+                                    <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                                      <AlertCircle size={28} className="text-red-400" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-red-400 mb-2">Analysis Rejected</h3>
+                                    <p className="text-sm text-red-300 max-w-sm leading-relaxed">{result.message}</p>
+                                  </motion.div>
+                              )}
+
+                              {/* Unknown / Low Confidence States (Yellow) */}
+                              {(result.status === 'unknown' || result.status === 'low_confidence') && (
+                                  <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className="rounded-2xl p-6 border border-yellow-500/30 bg-yellow-500/10 flex flex-col items-center text-center">
+                                    <div className="w-14 h-14 rounded-full bg-yellow-500/20 flex items-center justify-center mb-4">
+                                      <AlertCircle size={28} className="text-yellow-400" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-yellow-400 mb-2">
+                                      {result.status === 'unknown' ? 'Uncertain Result' : 'Low Confidence Detection'}
+                                    </h3>
+                                    <p className="text-sm text-yellow-300 max-w-md leading-relaxed mb-4">{result.message || result.description}</p>
+
+                                    {result.status === 'low_confidence' && (
+                                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                                          <span className="text-xs uppercase tracking-widest text-yellow-500 font-bold">Possible Condition:</span>
+                                          <span className="text-sm font-black text-white">{result.disease}</span>
+                                        </div>
+                                    )}
+                                  </motion.div>
+                              )}
+
+                              {/* Healthy State (Green) */}
+                              {result.status === 'healthy' && (
+                                  <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className="rounded-2xl p-6 border border-green-500/30 bg-green-500/10 flex flex-col items-center text-center">
+                                    <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
+                                      <ShieldCheck size={28} className="text-green-400" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-green-400 mb-2">Healthy Skin Detected</h3>
+                                    <p className="text-sm text-green-300 max-w-sm leading-relaxed">{result.message || result.description}</p>
+                                  </motion.div>
+                              )}
+
+                              {/* Success State (Known Disease Grid) */}
+                              {result.status === 'known' && (
+                                  <>
+                                    <motion.div variants={{ hidden: { opacity: 0, x: -10 }, show: { opacity: 1, x: 0 } }} className="flex items-center gap-2 mb-1">
+                                      <CheckCircle2 size={22} style={{ color: 'var(--accent)' }}/>
+                                      <h3 className="text-xl font-black" style={{ color: 'var(--tx)' }}>Analysis Result</h3>
+                                    </motion.div>
+
+                                    <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className={`grid grid-cols-1 ${result.segmented_url ? 'lg:grid-cols-2' : ''} gap-4`}>
+
+                                      <div className="flex flex-col gap-4">
+                                        <div className="rounded-2xl p-5 flex-1 flex flex-col justify-center relative overflow-hidden" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                          <div className="absolute -right-2 -top-2 p-4 opacity-5 pointer-events-none"><Activity size={80}/></div>
+                                          <p className="text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tx3)' }}>Detected condition</p>
+                                          <p className="text-xl sm:text-2xl font-black leading-tight" style={{ color: 'var(--tx)' }}>{result.disease}</p>
+                                        </div>
+
+                                        <div className="rounded-2xl p-5" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                          <div className="flex items-end justify-between mb-3">
+                                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--tx3)' }}>Confidence score</p>
+                                            <span className="text-2xl font-black leading-none" style={{ color: confColor(confidenceDisplay) }}>{confidenceDisplay}%</span>
+                                          </div>
+                                          <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                                            <div className="h-full rounded-full transition-all duration-75 ease-out" style={{ width: `${confidenceDisplay}%`, background: `linear-gradient(90deg, ${confColor(result.confidence)}77, ${confColor(result.confidence)})` }} />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {result.segmented_url && (
+                                          <div className="rounded-2xl p-5 flex flex-col items-center justify-center relative group" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                            <p className="text-xs font-bold uppercase tracking-widest mb-3 w-full text-left flex items-center gap-2" style={{ color: 'var(--tx3)' }}>
+                                              <Scan size={14} style={{ color: 'var(--accent)' }}/> U-Net Segmentation Mask
+                                            </p>
+                                            <div className="relative rounded-xl overflow-hidden shadow-lg border-2 w-full max-w-[200px] aspect-square flex items-center justify-center" style={{ borderColor: 'var(--accent)', background: '#060c10' }}>
+                                              <img src={result.segmented_url} alt="Segmented Mask" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-300" />
+                                            </div>
+                                          </div>
+                                      )}
+                                    </motion.div>
+                                  </>
+                              )}
                             </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
                   </div>
+
+                  {/* ── BOTTOM SECTION: Full Width Text Blocks ── */}
+                  <AnimatePresence mode="wait">
+                    {result && !loading && (
+                        <motion.div key="result-bottom" variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } } }} initial="hidden" animate="show" className="mt-8 space-y-6">
+
+                          {(result.description || result.appearance) && (
+                              <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className="rounded-2xl p-6 md:p-8 space-y-6" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                {result.description && (
+                                    <div>
+                                      <p className="text-sm font-bold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--accent)' }}>
+                                        <Info size={16} /> Clinical Overview
+                                      </p>
+                                      <p className="text-sm md:text-base leading-relaxed" style={{ color: 'var(--tx2)' }}>{result.description}</p>
+                                    </div>
+                                )}
+                                {result.appearance && (
+                                    <div className="pt-2">
+                                      <p className="text-sm font-bold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--accent)' }}>
+                                        <ImageIcon size={16} /> Common Appearance
+                                      </p>
+                                      <p className="text-sm md:text-base leading-relaxed" style={{ color: 'var(--tx2)' }}>{result.appearance}</p>
+                                    </div>
+                                )}
+                              </motion.div>
+                          )}
+
+                          <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className={`grid grid-cols-1 ${(result.tips?.length > 0 && result.precautions?.length > 0) ? 'md:grid-cols-2' : ''} gap-6`}>
+                            {result.tips?.length > 0 && (
+                                <div className="rounded-2xl p-6 md:p-8" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                  <p className="text-sm font-bold uppercase tracking-widest mb-5 flex items-center gap-2" style={{ color: 'var(--accent)' }}>
+                                    <Lightbulb size={16} /> Recommendations & Care
+                                  </p>
+                                  <ul className="space-y-4">
+                                    {result.tips.map((s: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-3 text-sm md:text-base leading-relaxed" style={{ color: 'var(--tx2)' }}>
+                                          <ChevronRight size={18} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}/>
+                                          <span>{s}</span>
+                                        </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                            )}
+
+                            {result.precautions?.length > 0 && (
+                                <div className="rounded-2xl p-6 md:p-8 border border-red-500/20 bg-red-500/5 relative overflow-hidden">
+                                  <div className="absolute -right-4 -top-4 p-4 opacity-5 pointer-events-none text-red-500"><ShieldAlert size={120}/></div>
+                                  <p className="text-sm font-bold uppercase tracking-widest mb-5 flex items-center gap-2 text-red-400 relative z-10">
+                                    <AlertCircle size={16} /> When to see a doctor
+                                  </p>
+                                  <ul className="space-y-4 relative z-10">
+                                    {result.precautions.map((s: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-3 text-sm md:text-base leading-relaxed text-red-200">
+                                          <AlertCircle size={16} className="mt-0.5 flex-shrink-0 text-red-400"/>
+                                          <span>{s}</span>
+                                        </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                            )}
+                          </motion.div>
+                          {/* ── CLINICAL SOURCES & REFERENCES CARD ── */}
+                          {result.sources?.length > 0 && (
+                              <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className="rounded-xl p-4 mt-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-2" style={{ color: 'var(--tx3)' }}>
+                                  <BookOpen size={14} style={{ color: 'var(--tx3)' }}/> Clinical Sources & References
+                                </p>
+                                <ul className="space-y-1.5">
+                                  {result.sources.map((s: string, i: number) => {
+                                    // Extract the URL from the parentheses
+                                    const match = s.match(/(.+?)\s*\((https?:\/\/[^\)]+)\)/);
+
+                                    return (
+                                        <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--tx3)' }}>
+                                          <span className="opacity-50 mt-[1px]" >•</span>
+                                          {match ? (
+                                              <a
+                                                  href={match[2]}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="transition-colors duration-200"
+                                                  style={{ color: 'var(--tx3)', textDecoration: 'none' }}
+                                                  onMouseEnter={(e) => {
+                                                    e.currentTarget.style.color = 'var(--accent)';
+                                                    e.currentTarget.style.textDecoration = 'underline';
+                                                  }}
+                                                  onMouseLeave={(e) => {
+                                                    e.currentTarget.style.color = 'var(--tx3)';
+                                                    e.currentTarget.style.textDecoration = 'none';
+                                                  }}
+                                              >
+                                                {match[1]}
+                                              </a>
+                                          ) : (
+                                              <span>{s}</span>
+                                          )}
+                                        </li>
+                                    );
+                                  })}
+                                </ul>
+                              </motion.div>
+                          )}
+                          <motion.button
+                              variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }}
+                              onClick={reset}
+                              className="w-full py-4 rounded-xl text-sm font-bold transition-all duration-200 active:scale-[0.98]"
+                              style={{ background: 'var(--surface2)', border: '1px solid var(--br)', color: 'var(--tx)' }}
+                              onMouseEnter={e => {
+                                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)';
+                                (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)';
+                              }}
+                              onMouseLeave={e => {
+                                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--br)';
+                                (e.currentTarget as HTMLButtonElement).style.color = 'var(--tx)';
+                              }}
+                          >
+                            ↩ Scan another image
+                          </motion.button>
+                        </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
             )}
           </AnimatePresence>

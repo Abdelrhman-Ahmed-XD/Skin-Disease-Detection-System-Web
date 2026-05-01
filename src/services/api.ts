@@ -1,12 +1,20 @@
-interface PredictionRequest {
+export interface PredictionRequest {
   imageUrl: string;
+  photoType: 'phone' | 'dermo';
 }
 
-interface PredictionResponse {
+export interface PredictionResponse {
+  status: 'no_lesion' | 'bad_photo' | 'healthy' | 'unknown' | 'low_confidence' | 'known';
   disease: string;
+  disease_code?: string;
   confidence: number;
+  entropy?: number;
+  segmented_url: string | null;
   description: string;
-  suggestions: string[];
+  tips: string[];
+  precautions: string[];
+  sources: string[];
+  message: string | null;
 }
 
 export const predictSkinDisease = async (request: PredictionRequest): Promise<PredictionResponse> => {
