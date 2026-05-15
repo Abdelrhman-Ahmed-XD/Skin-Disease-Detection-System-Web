@@ -25,7 +25,7 @@ const PipelineCard: React.FC = () => {
   const steps = [
     { icon: Upload,   label: 'Upload',    color: '#60a5fa', desc: 'Photo sent to Cloudinary CDN' },
     { icon: Eye,      label: 'UNet Mask', color: '#34d399', desc: 'Pixel-level lesion segmentation' },
-    { icon: Cpu,      label: 'Seif Model', color: '#a78bfa', desc: 'Disease classification' },
+    { icon: Cpu,      label: 'CNN Model', color: '#a78bfa', desc: 'Disease classification' },
     { icon: BarChart2,label: 'Results',   color: '#00e5ff', desc: 'Confidence score + description' },
   ];
 
