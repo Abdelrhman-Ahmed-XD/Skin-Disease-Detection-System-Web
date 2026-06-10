@@ -33,11 +33,11 @@
   --accent-lt: #67f0ff;
   --accent-dim:  rgba(0,229,255,0.09);
   --accent-glow: rgba(0,229,255,0.18);
-  --tx:        #f0f6ff;
-  --tx2:       #7a90b8;
-  --tx3:       #3d527a;
-  --br:        rgba(255,255,255,0.06);
-  --br2:       rgba(255,255,255,0.12);
+  --tx:        #f2f7ff;
+  --tx2:       #c4d8ee;
+  --tx3:       #8fb0cc;
+  --br:        rgba(255,255,255,0.08);
+  --br2:       rgba(255,255,255,0.15);
 }
 
 html { scroll-behavior: smooth; }

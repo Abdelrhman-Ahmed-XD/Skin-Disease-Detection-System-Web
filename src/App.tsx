@@ -4,6 +4,7 @@ import {ThemeProvider} from './context/ThemeContext';
 import {AuthProvider} from './context/AuthContext';
 import {Layout} from './components/Layout';
 import {ProtectedRoute} from './components/ProtectedRoute';
+import {PublicRoute} from './components/PublicRoute';
 
 // ── Lazy Load Pages for Code Splitting ──
 const Landing = lazy(() => import('./pages/Landing').then(module => ({default: module.Landing})));
@@ -32,10 +33,10 @@ const App: React.FC = () => (
                     <Routes>
                         <Route path="/" element={<Layout/>}>
                             <Route index element={<Landing/>}/>
-                            <Route path="login" element={<Login/>}/>
-                            <Route path="signup" element={<Signup/>}/>
-                            <Route path="forgot-password" element={<ForgotPassword/>}/>
-                            <Route path="reset-password" element={<ResetPassword/>}/>
+                            <Route path="login" element={<PublicRoute><Login/></PublicRoute>}/>
+                            <Route path="signup" element={<PublicRoute><Signup/></PublicRoute>}/>
+                            <Route path="forgot-password" element={<PublicRoute><ForgotPassword/></PublicRoute>}/>
+                            <Route path="reset-password" element={<PublicRoute><ResetPassword/></PublicRoute>}/>
 
                             <Route path="dashboard" element={<ProtectedRoute><Dashboard/></ProtectedRoute>}/>
                             <Route path="history" element={<ProtectedRoute><History/></ProtectedRoute>}/>

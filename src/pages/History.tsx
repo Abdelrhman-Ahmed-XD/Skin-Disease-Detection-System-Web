@@ -183,11 +183,13 @@ const ScanModal: React.FC<{ scan: Scan; onClose: () => void; onDeleteClick: () =
                 </div>
 
                 <div className="overflow-y-auto flex-1">
-                    <div className="relative" style={{ height: 256, background: 'var(--surface2)' }}>
-                        <img src={displayImage} alt={displayDisease} className="w-full h-full object-contain"
+                    {/* Full-width original image */}
+                    <div className="relative flex-shrink-0 overflow-hidden" style={{ background: 'var(--surface2)', height: 260 }}>
+                        <img src={displayImage} alt={displayDisease}
+                             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                              onError={(e) => { e.currentTarget.src = 'https://placehold.co/600x400/0f172a/00e5ff?text=Image+Unavailable'; }} />
                         {displayConfidence != null && displayConfidence > 0 && (
-                            <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold"
+                            <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-sm font-bold"
                                  style={{ background: 'rgba(0,0,0,0.72)', color: confidenceColor(displayConfidence), backdropFilter: 'blur(8px)' }}>
                                 {displayConfidence}%
                             </div>
@@ -204,13 +206,24 @@ const ScanModal: React.FC<{ scan: Scan; onClose: () => void; onDeleteClick: () =
 
                         {displayConfidence != null && displayConfidence > 0 && (
                             <div className="rounded-xl p-4 w-full" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-                                <div className="flex items-end justify-between mb-2">
+                                <div className="flex items-center justify-between mb-2">
                                     <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: 'var(--tx3)' }}>Confidence score</p>
                                     <span className="text-lg font-extrabold" style={{ color: confidenceColor(confidenceDisplay) }}>{confidenceDisplay}%</span>
                                 </div>
                                 <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                                     <motion.div className="h-full rounded-full transition-all duration-75 ease-out"
                                                 style={{ width: `${confidenceDisplay}%`, background: `linear-gradient(90deg, ${confidenceColor(displayConfidence)}77, ${confidenceColor(displayConfidence)})` }} />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* U-Net segmentation mask card */}
+                        {displaySegmentedUrl && (
+                            <div className="rounded-xl overflow-hidden" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                                <p className="text-[10px] uppercase tracking-widest font-bold px-4 pt-3 pb-2" style={{ color: 'var(--tx3)' }}>U-Net Segmentation Mask</p>
+                                <div className="flex items-center justify-center" style={{ background: '#060c10', height: 220 }}>
+                                    <img src={displaySegmentedUrl} alt="Segmentation mask"
+                                         style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
                                 </div>
                             </div>
                         )}
@@ -223,14 +236,6 @@ const ScanModal: React.FC<{ scan: Scan; onClose: () => void; onDeleteClick: () =
                             </div>
                         )}
 
-                        {displaySegmentedUrl && (
-                            <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-                                <p className="text-[10px] uppercase tracking-widest font-bold mb-3" style={{ color: 'var(--tx3)' }}>U-Net Segmentation Mask</p>
-                                <div className="relative rounded-xl overflow-hidden border-2 w-full max-w-[150px] aspect-square flex items-center justify-center mx-auto" style={{ borderColor: 'var(--accent)', background: '#060c10' }}>
-                                    <img src={displaySegmentedUrl} alt="Segmented Mask" className="w-full h-full object-contain opacity-90" />
-                                </div>
-                            </div>
-                        )}
 
                         {displayDescription && (
                             <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>

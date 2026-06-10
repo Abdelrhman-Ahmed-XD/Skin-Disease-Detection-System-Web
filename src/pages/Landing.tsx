@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Brain, ShieldCheck, History, Zap, Eye, Scan, Upload, Cpu, BarChart2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { HeroCard } from '../components/HeroCard';
+import { FloatingMoles, FloatingMolesPage, FloatingMolesMobile, FloatingMolesHeroMobile } from '../components/FloatingMoles';
 
 const GithubIcon = ({ size = 14 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -22,6 +23,10 @@ const fadeUp = {
 // ── Animated pipeline card for "How it works" section ───────────────────────
 const PipelineCard: React.FC = () => {
   const [active, setActive] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const steps = [
     { icon: Upload,   label: 'Upload',    color: '#60a5fa', desc: 'Photo sent to Cloudinary CDN' },
     { icon: Eye,      label: 'UNet Mask', color: '#34d399', desc: 'Pixel-level lesion segmentation' },
@@ -30,12 +35,28 @@ const PipelineCard: React.FC = () => {
   ];
 
   useEffect(() => {
-    const id = setInterval(() => setActive(a => (a + 1) % steps.length), 2000);
-    return () => clearInterval(id);
-  }, [steps.length]);
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (visible) {
+      // Reset to Upload (step 0) when card enters view, then start cycling
+      setActive(0);
+      intervalRef.current = setInterval(() => setActive(a => (a + 1) % steps.length), 2000);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [visible, steps.length]);
 
   return (
-      <div className="rounded-xl p-5 transition-colors duration-300" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+      <div ref={cardRef} className="rounded-xl p-5 transition-colors duration-300" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>AI Pipeline</p>
           <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
@@ -106,6 +127,8 @@ export const Landing: React.FC = () => {
 
   return (
       <div className="space-y-8 pb-20">
+        <FloatingMolesPage />
+        <FloatingMolesMobile />
 
         {/* ── Hero ── */}
         <section className="relative overflow-hidden rounded-2xl px-6 py-14 sm:px-10 sm:py-16 transition-colors duration-300 shadow-sm"
@@ -116,6 +139,8 @@ export const Landing: React.FC = () => {
             <div className="blob absolute -bottom-24 right-0 w-96 h-96 rounded-full"
                  style={{ background: 'radial-gradient(circle, var(--accent-glow) 0%, transparent 65%)', animationDelay: '-4s' }}/>
           </div>
+          <FloatingMoles />
+          <FloatingMolesHeroMobile />
 
           <div className="relative grid gap-10 lg:grid-cols-2 lg:items-center">
             {/* CHANGED TO whileInView */}
@@ -193,7 +218,7 @@ export const Landing: React.FC = () => {
         </section>
 
         {/* ── How it works ── */}
-        <section id="how" className="rounded-2xl px-6 py-10 sm:px-10 space-y-7 transition-colors duration-300 shadow-sm"
+        <section id="how" className="relative rounded-2xl px-6 py-10 sm:px-10 space-y-7 transition-colors duration-300 shadow-sm overflow-hidden"
                  style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
           <motion.div {...fadeUp} className="space-y-1">
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Process</p>
@@ -235,7 +260,7 @@ export const Landing: React.FC = () => {
             </p>
             <p className="text-xs leading-relaxed transition-colors duration-300" style={{ color: 'var(--tx2)' }}>
               <strong style={{ color: 'var(--tx)' }}>Stack:</strong> React Native(Expo) · React + Vite · Python Flask ·
-              TensorFlow/Keras (CNN) · PyTorch (UNet) · Firebase · Cloudinary
+              PyTorch (CNN) · PyTorch (UNet) · Firebase · Cloudinary
             </p>
             <div className="flex gap-2 pt-1 flex-wrap">
               <a href="https://github.com/Abdelrhman-Ahmed-XD/Skin-Disease-Detection-System" target="_blank" rel="noreferrer"

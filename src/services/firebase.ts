@@ -17,4 +17,12 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
+
 export const facebookProvider = new FacebookAuthProvider();
+facebookProvider.addScope('email');
+facebookProvider.addScope('public_profile');
+// Firebase console → Authentication → Sign-in providers → Facebook must be enabled.
+// Facebook Developer App → Settings → Valid OAuth Redirect URIs must include:
+//   https://<your-project>.firebaseapp.com/__/auth/handler

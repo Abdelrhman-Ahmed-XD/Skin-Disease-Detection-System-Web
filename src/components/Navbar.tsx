@@ -133,10 +133,17 @@ export const Navbar: React.FC = () => {
                           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
                           style={{ color: isActive('/profile') ? 'var(--accent)' : 'var(--tx2)',
                             background: isActive('/profile') ? 'var(--accent-dim)' : 'transparent' }}>
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                           style={{ background: 'var(--accent)', color: '#070d1a' }}>
-                        {firstName.charAt(0).toUpperCase()}
-                      </div>
+                      {userProfile?.photoUri ? (
+                        <img src={userProfile.photoUri} alt={firstName}
+                             className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                             style={{ border: '1.5px solid var(--accent)' }}
+                             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}/>
+                      ) : (
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                             style={{ background: 'var(--accent)', color: '#070d1a' }}>
+                          {firstName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <span>{firstName}</span>
                     </Link>
                     <button onClick={handleLogout}

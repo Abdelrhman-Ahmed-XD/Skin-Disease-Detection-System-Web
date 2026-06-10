@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Toaster } from 'react-hot-toast';
 import { useTheme } from '../context/ThemeContext';
+import { ChatBot } from './ChatBot';
 
 export const Layout: React.FC = () => {
     const { theme } = useTheme();
@@ -12,6 +13,7 @@ export const Layout: React.FC = () => {
             <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                 <Outlet />
             </main>
+            <ChatBot />
             <Toaster
                 position="top-right"
                 toastOptions={{

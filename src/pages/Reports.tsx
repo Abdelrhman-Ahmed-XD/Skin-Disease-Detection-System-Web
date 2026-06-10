@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { collection, query, getDocs } from 'firebase/firestore';
-import { TrendingUp, ShieldCheck, Activity, Layers, Download, FileText, Info } from 'lucide-react';
+import { collection, query, getDocs, doc, setDoc } from 'firebase/firestore';
+import { uploadPDFToCloudinary } from '../services/cloudinary';
+import { TrendingUp, ShieldCheck, Activity, Layers, Download, FileText, Info, Cloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -82,8 +83,8 @@ const CSS = `
   .pdf-container { font-family: Georgia, 'Times New Roman', serif; background: #D8E9F0; width: 100%; text-align: left; }
   .pdf-container * { box-sizing: border-box; margin: 0; padding: 0; }
   .pdf-container .page { margin: 0 auto; background: #D8E9F0; overflow: hidden; page-break-after: always; }
-  .pdf-container .page.single { width: 700px; }
-  .pdf-container .page.summary { width: 960px; }
+  .pdf-container .page.single { width: 794px; }
+  .pdf-container .page.summary { width: 794px; }
   .pdf-container .page:last-child { page-break-after: auto; }
   .pdf-container .header { background: #004F7F; padding: 32px 24px 24px; text-align: center; }
   .pdf-container .brand { font-size: 42px; font-weight: bold; color: #fff; letter-spacing: 2px; }
@@ -100,7 +101,7 @@ const CSS = `
   .pdf-container .patient-section { background: #fff; border-left: 1px solid #C5E3ED; border-right: 1px solid #C5E3ED; padding: 16px 24px; border-top: 1px solid #E5F0F6; }
   .pdf-container .section-title { font-size: 13px; font-weight: bold; color: #004F7F; margin-bottom: 12px; font-family: system-ui, sans-serif; text-transform: uppercase; letter-spacing: .5px; }
   .pdf-container .patient-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  .pdf-container .patient-grid.wide { grid-template-columns: repeat(6, 1fr); }
+  .pdf-container .patient-grid.wide { grid-template-columns: repeat(4, 1fr); }
   .pdf-container .info-item { background: #F4FBFF; border-radius: 8px; padding: 10px 12px; border: 1px solid #C5E3ED; }
   .pdf-container .info-label { font-size: 10px; color: #9CA3AF; font-family: system-ui, sans-serif; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; }
   .pdf-container .info-value { font-size: 13px; font-weight: bold; color: #1F2937; font-family: system-ui, sans-serif; }
@@ -172,7 +173,72 @@ const CSS = `
   .pdf-container .footer-s { color: #00A3A3; }
   .pdf-container .footer-copy { color: #C5E3ED; font-size: 11px; font-family: system-ui, sans-serif; }
   .pdf-container .footer-email { color: #8ab4c9; font-size: 10px; margin-top: 4px; font-family: system-ui, sans-serif; }
+
+  /* ── Single-page compact overrides ─────────────────────────────────── */
+  .pdf-container .page.single .header   { padding: 14px 24px 10px; }
+  .pdf-container .page.single .brand    { font-size: 30px; }
+  .pdf-container .page.single .tagline  { font-size: 10px; margin-top: 2px; }
+  .pdf-container .page.single .divider  { margin: 6px auto 0; width: 36px; height: 2px; }
+  .pdf-container .page.single .banner   { padding: 5px 20px; }
+  .pdf-container .page.single .banner p { font-size: 11px; }
+  .pdf-container .page.single .report-bar  { padding: 7px 20px; }
+  .pdf-container .page.single .report-num  { font-size: 15px; }
+  .pdf-container .page.single .patient-section { padding: 10px 20px; }
+  .pdf-container .page.single .section-title   { font-size: 11px; margin-bottom: 8px; }
+  .pdf-container .page.single .patient-grid    { gap: 6px; }
+  .pdf-container .page.single .info-item  { padding: 6px 8px; }
+  .pdf-container .page.single .info-label { font-size: 9px; }
+  .pdf-container .page.single .info-value { font-size: 11px; }
+  .pdf-container .page.single .image-section { padding: 0 20px 10px; }
+  .pdf-container .page.single .image-wrapper img,
+  .pdf-container .page.single .mask-wrapper img { max-height: 155px; }
+  .pdf-container .page.single .analysis-section { padding: 10px 20px; }
+  .pdf-container .page.single .condition-name  { font-size: 17px; }
+  .pdf-container .page.single .description-box { padding: 8px 12px; margin-bottom: 8px; }
+  .pdf-container .page.single .description-text { font-size: 11px; line-height: 1.5; }
+  .pdf-container .page.single .tips-list li { font-size: 11px; margin-bottom: 3px; }
+  .pdf-container .page.single .sources-section { padding: 0 20px 8px; }
+  .pdf-container .page.single .sources-list li  { font-size: 9px; margin-bottom: 1px; }
+  .pdf-container .page.single .warning-section  { padding: 0 20px 8px; }
+  .pdf-container .page.single .warning-box   { padding: 8px 12px; }
+  .pdf-container .page.single .warning-title { font-size: 10px; }
+  .pdf-container .page.single .warning-text  { font-size: 10px; }
+  .pdf-container .page.single .warning-list li { font-size: 10px; margin-bottom: 2px; }
+  .pdf-container .page.single .footer       { padding: 10px 20px; }
+  .pdf-container .page.single .footer-brand { font-size: 14px; }
+  .pdf-container .page.single .footer-copy  { font-size: 9px; }
+  .pdf-container .page.single .footer-email { font-size: 8px; margin-top: 2px; }
+
+  /* ── Summary: mask column + confidence ──────────────────────────────── */
+  .pdf-container .tmask { text-align: center; }
+  .pdf-container .tmask img { width: 50px; height: 50px; border-radius: 6px; border: 2px solid #00A3A3; background: #060c10; object-fit: contain; display: block; margin: 0 auto; }
+  .pdf-container .tmask-ph  { width: 50px; height: 50px; border-radius: 6px; border: 2px dashed #C5E3ED; display: flex; align-items: center; justify-content: center; color: #9CA3AF; font-size: 8px; margin: 0 auto; background: #F4FBFF; }
+  .pdf-container .tconf { font-size: 12px; font-weight: bold; text-align: center; }
+  .pdf-container .mini-hdr { background: #004F7F; padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; }
 `;
+
+// ── Disease severity accent colors ────────────────────────────────────────────
+const getDiseaseAccent = (analysis: string): string => {
+    const a = analysis.toUpperCase();
+    if (a.includes('MEL')) return '#b91c1c';
+    if (a.includes('BCC')) return '#c2410c';
+    if (a.includes('BKL')) return '#b45309';
+    if (a.includes('NV'))  return '#15803d';
+    return '#004F7F';
+};
+
+const getSeverity = (analysis: string): { label: string; color: string; bg: string; border: string } => {
+    const a = analysis.toUpperCase();
+    if (a.includes('MEL') || a.includes('BCC') || a.includes('SCC') || a.includes('AKIEC'))
+        return { label: 'DANGEROUS: See a doctor immediately', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' };
+    if (a.includes('VASC') || a.includes('AK') || a.includes('DF'))
+        return { label: 'NEEDS CHECKUP: Monitor closely', color: '#d97706', bg: '#fffbeb', border: '#fcd34d' };
+    if (a.includes('NV') || a.includes('BKL') || a.includes('NEVUS'))
+        return { label: 'LIKELY SAFE: Continue regular monitoring', color: '#16a34a', bg: '#f0fdf4', border: '#86efac' };
+    return { label: 'NEEDS CHECKUP: Consult a dermatologist', color: '#d97706', bg: '#fffbeb', border: '#fcd34d' };
+};
+
+const getConfColor = (conf: number): string => conf >= 80 ? '#22c55e' : conf >= 60 ? '#f59e0b' : '#ef4444';
 
 // ── 1. SINGLE REPORT HTML ──────────────────────────────────────────────────
 const buildReportHTML = (params: {
@@ -184,209 +250,415 @@ const buildReportHTML = (params: {
 }) => {
     const age = params.birthYear ? `${new Date().getFullYear() - params.birthYear} years` : 'N/A';
     const dob = params.birthYear ? `${params.birthDay ?? '?'}/${params.birthMonth ?? '?'}/${params.birthYear}` : 'N/A';
+    const accent = getDiseaseAccent(params.analysis);
+    const sev = getSeverity(params.analysis);
+    const confColor = getConfColor(params.confidence ?? 0);
 
     return `
-    <div class="page single">
-      <div class="header">
+    <div class="page single" style="display:flex;flex-direction:column;height:1122px;overflow:hidden;">
+
+      <div class="header" style="flex-shrink:0;">
         <div class="brand"><span class="brand-s">S</span>kinSight</div>
         <div class="tagline">Snap · Detect · Protect</div>
         <div class="divider"></div>
       </div>
-      <div class="banner"><p>Skin Analysis Report</p></div>
-      <div class="report-bar">
+
+      <div class="banner" style="flex-shrink:0;"><p>Skin Analysis Report</p></div>
+
+      <div class="report-bar" style="flex-shrink:0;">
         <div class="report-num">Report #${params.reportIndex}</div>
         <div class="report-date">${params.date}</div>
       </div>
-      <div class="patient-section">
-        <div class="section-title">Patient Information</div>
-        <div class="patient-grid">
-          <div class="info-item"><div class="info-label">Name</div><div class="info-value">${params.patientName || 'N/A'}</div></div>
-          <div class="info-item"><div class="info-label">Gender</div><div class="info-value" style="text-transform:capitalize">${params.gender || 'N/A'}</div></div>
-          <div class="info-item"><div class="info-label">Age</div><div class="info-value">${age}</div></div>
-          <div class="info-item"><div class="info-label">Date of birth</div><div class="info-value">${dob}</div></div>
-          <div class="info-item"><div class="info-label">Skin tone</div><div class="info-value" style="display:flex;align-items:center;gap:6px">${params.skinColor ? `<span style="width:14px;height:14px;border-radius:50%;background:${params.skinColor};display:inline-block;border:1px solid #ccc"></span>` : ''}N/A</div></div>
-          <div class="info-item"><div class="info-label">Location</div><div class="info-value">${params.bodyView || 'N/A'}</div></div>
+
+      <div style="flex-shrink:0;padding:8px 20px;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;border-top:1px solid #E5F0F6;">
+        <div style="font-size:10px;font-weight:bold;color:#004F7F;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-family:system-ui,sans-serif;">Patient Information</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;">
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Name</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">${params.patientName || 'N/A'}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Gender</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;text-transform:capitalize;">${params.gender || 'N/A'}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Age</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">${age}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Date of Birth</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">${dob}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Skin Tone</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">N/A</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Location</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">${params.bodyView || 'N/A'}</div></div>
         </div>
       </div>
-      <div class="image-section">
-        ${params.imageBase64 ? `
-        <div class="image-wrapper">
-            <div class="img-label">Original Scan</div>
-            <img src="${params.imageBase64}" alt="Scan image"/>
-        </div>` : ''}
-        ${params.maskBase64 ? `
-        <div class="mask-wrapper">
-            <div class="img-label" style="color: #00A3A3;">U-Net Segmentation</div>
-            <img src="${params.maskBase64}" alt="Segmentation Mask"/>
-        </div>` : ''}
-      </div>
-      <div class="analysis-section">
-        <div class="section-title">Analysis Results</div>
-        <div class="condition-row">
-          <div class="condition-name">${params.analysis || 'Unknown condition'}</div>
-          <div class="confidence-badge">${params.confidence?.toFixed(1) ?? '—'}% confidence</div>
+
+      ${(params.imageBase64 || params.maskBase64) ? `
+      <div style="flex-shrink:0;padding:0 20px 10px;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;border-top:1px solid #E5F0F6;">
+        <div style="display:flex;gap:14px;">
+          ${params.imageBase64 ? `
+          <div style="flex:1;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,79,127,0.12);">
+            <div style="padding:5px 10px 3px;font-size:9px;font-weight:bold;color:#9CA3AF;text-transform:uppercase;letter-spacing:.5px;background:#F4FBFF;font-family:system-ui,sans-serif;">Original Scan</div>
+            <div style="height:115px;background:#F4FBFF;display:flex;align-items:center;justify-content:center;">
+              <img src="${params.imageBase64}" alt="Scan" style="max-width:96%;max-height:108px;object-fit:contain;display:block;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,0.15);"/>
+            </div>
+          </div>` : ''}
+          ${params.maskBase64 ? `
+          <div style="flex:1;border:2px solid #00A3A3;border-radius:14px;overflow:hidden;">
+            <div style="padding:5px 10px 3px;font-size:9px;font-weight:bold;color:#00A3A3;text-transform:uppercase;letter-spacing:.5px;background:#060c10;font-family:system-ui,sans-serif;">U-Net Segmentation</div>
+            <div style="height:115px;background:#060c10;display:flex;align-items:center;justify-content:center;">
+              <img src="${params.maskBase64}" alt="Mask" style="max-width:100%;max-height:115px;object-fit:contain;display:block;"/>
+            </div>
+          </div>` : ''}
         </div>
-        ${params.confidence ? `
-        <div class="confidence-bar-wrap">
-          <div class="confidence-bar" style="width:${Math.min(params.confidence, 100)}%"></div>
-        </div>` : ''}
+      </div>` : ''}
+
+      <div style="flex:1;overflow:hidden;padding:12px 20px;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;border-top:1px solid #E5F0F6;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <div style="width:4px;height:26px;background:${accent};border-radius:4px;flex-shrink:0;"></div>
+          <div style="font-size:11px;font-weight:bold;color:#004F7F;text-transform:uppercase;letter-spacing:.5px;font-family:system-ui,sans-serif;">Analysis Results</div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <div style="font-size:17px;font-weight:bold;color:${accent};font-family:system-ui,sans-serif;">${params.analysis || 'Unknown condition'}</div>
+          <div style="display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;background:${sev.bg};border:1px solid ${sev.border};white-space:nowrap;flex-shrink:0;">
+            <span style="font-size:10px;font-weight:bold;color:${sev.color};font-family:system-ui,sans-serif;">${sev.label}</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+          <div style="font-size:10px;color:#6B7280;font-family:system-ui,sans-serif;">Confidence Score</div>
+          <div style="font-size:12px;font-weight:bold;color:${confColor};font-family:system-ui,sans-serif;">${params.confidence?.toFixed(1) ?? '—'}%</div>
+        </div>
+        <div style="height:7px;background:#E5F0F6;border-radius:6px;overflow:hidden;margin-bottom:12px;">
+          <div style="height:100%;width:${Math.min(params.confidence ?? 0, 100)}%;background:linear-gradient(90deg,${confColor}99,${confColor});border-radius:6px;"></div>
+        </div>
+
         ${params.description ? `
-        <div class="description-box">
-          <div class="description-label">Clinical Overview</div>
-          <div class="description-text">${params.description}</div>
+        <div style="background:#F4FBFF;border-radius:8px;padding:8px 12px;border:1px solid #C5E3ED;margin-bottom:8px;">
+          <div style="font-size:9px;color:#9CA3AF;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;font-family:system-ui,sans-serif;">Clinical Overview</div>
+          <div style="font-size:11px;color:#374151;line-height:1.5;font-family:system-ui,sans-serif;">${params.description}</div>
         </div>` : ''}
+
         ${params.tips.length > 0 ? `
-        <div class="description-box">
-          <div class="description-label" style="color: #00A3A3;">Recommendations & Care</div>
-          <ul class="tips-list">${params.tips.map(t => `<li>${t}</li>`).join('')}</ul>
+        <div style="background:#F4FBFF;border-radius:8px;padding:8px 12px;border:1px solid #C5E3ED;margin-bottom:8px;">
+          <div style="font-size:9px;color:#00A3A3;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;font-family:system-ui,sans-serif;">Recommendations & Care</div>
+          <ul style="padding-left:16px;margin:0;">${params.tips.map(t => `<li style="font-size:11px;color:#374151;line-height:1.5;font-family:system-ui,sans-serif;margin-bottom:3px;">${t}</li>`).join('')}</ul>
+        </div>` : ''}
+
+        ${params.precautions.length > 0 ? `
+        <div style="background:#fef2f2;border-left:3px solid #ef4444;border-radius:6px;padding:7px 12px;margin-bottom:8px;">
+          <div style="font-size:9px;color:#b91c1c;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;font-family:system-ui,sans-serif;">⚠ When to see a doctor</div>
+          <ul style="padding-left:16px;margin:0;">${params.precautions.map(p => `<li style="font-size:10px;color:#991b1b;line-height:1.5;font-family:system-ui,sans-serif;margin-bottom:2px;">${p}</li>`).join('')}</ul>
+        </div>` : ''}
+
+        ${params.sources.length > 0 ? `
+        <div style="margin-bottom:8px;">
+          <div style="font-size:8px;color:#9CA3AF;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-family:system-ui,sans-serif;">Clinical Sources</div>
+          <ul style="padding-left:14px;margin:0;">${params.sources.map(s => `<li style="font-size:7.5px;color:#6B7280;font-family:system-ui,sans-serif;line-height:1.4;margin-bottom:1px;word-break:break-word;">${s}</li>`).join('')}</ul>
         </div>` : ''}
       </div>
-      ${params.precautions.length > 0 ? `
-      <div class="warning-section">
-        <div class="warning-box">
-          <div class="warning-title">⚠️ When to see a doctor</div>
-          <ul class="warning-list">${params.precautions.map(p => `<li>${p}</li>`).join('')}</ul>
-        </div>
-      </div>` : ''}
-      ${params.sources.length > 0 ? `
-      <div class="sources-section">
-        <div class="section-title">Clinical Sources & References</div>
-        <ul class="sources-list">${params.sources.map(s => `<li>${s}</li>`).join('')}</ul>
-      </div>` : ''}
-      <div class="warning-section">
-        <div class="warning-box yellow">
-          <p class="warning-text">⚠️ <strong>Medical Disclaimer:</strong> This report is generated by an AI model and is for informational purposes only. Always consult a qualified dermatologist.</p>
+
+      <div style="flex-shrink:0;padding:0 20px 10px;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;">
+        <div style="background:#fffbeb;border-left:3px solid #fbbf24;border-radius:6px;padding:8px 12px;">
+          <p style="font-size:10px;color:#92400e;font-family:system-ui,sans-serif;margin:0;"><strong>Medical Disclaimer:</strong> This report is generated by an AI model and is for informational purposes only. Always consult a qualified dermatologist.</p>
         </div>
       </div>
-      <div class="footer">
+
+      <div class="footer" style="flex-shrink:0;">
         <div class="footer-divider"></div>
         <div class="footer-brand"><span class="footer-s">S</span>kinSight</div>
         <div class="footer-copy">© 2026 SkinSight — Graduation Project · Faculty of Computers &amp; AI</div>
         <div class="footer-email">📧 skinsight.help.2025@gmail.com</div>
       </div>
+
     </div>`;
 };
 
 // ── 2. SUMMARY (ALL REPORTS) HTML ─────────────────────────────────────────
 const buildAllReportsHTML = (params: {
-    rows: Array<{ index: number; date: string; bodyView: string; analysis: string; imageBase64: string; description: string; source: string; }>;
+    rows: Array<{
+        index: number; date: string; bodyView: string; analysis: string;
+        confidence: number; imageBase64: string; maskBase64: string; source: string;
+    }>;
     patientName: string; gender: string; skinColor: string; generatedDate: string;
     birthYear?: number; birthMonth?: number; birthDay?: number;
 }) => {
     const age = params.birthYear ? `${new Date().getFullYear() - params.birthYear} years` : 'N/A';
+    const dob = params.birthYear ? `${params.birthDay ?? '?'}/${params.birthMonth ?? '?'}/${params.birthYear}` : 'N/A';
 
-    return `
-    <div class="page summary">
-      <div class="header">
-        <div class="brand"><span class="brand-s">S</span>kinSight</div>
-        <div class="tagline">Snap · Detect · Protect</div>
-        <div class="divider"></div>
-      </div>
-      <div class="banner"><p>Complete Skin Analysis Summary</p></div>
-      <div class="meta">
-        <div class="mtitle">All Reports — Full History</div>
-        <div class="report-date">Generated: ${params.generatedDate}</div>
-      </div>
-      <div class="patient-section">
-        <div class="section-title">Patient Information</div>
-        <div class="patient-grid wide">
-          <div class="info-item"><div class="info-label">Name</div><div class="info-value">${params.patientName || 'N/A'}</div></div>
-          <div class="info-item"><div class="info-label">Age</div><div class="info-value">${age}</div></div>
-          <div class="info-item"><div class="info-label">Gender</div><div class="info-value" style="text-transform:capitalize">${params.gender || 'N/A'}</div></div>
-          <div class="info-item"><div class="info-label">Skin Tone</div><div class="info-value">${params.skinColor || 'N/A'}</div></div>
+    // Dynamic chunking — conservative row estimates to avoid overflow
+    const ROWS_P1   = 9;   // first page has more fixed sections
+    const ROWS_CONT = 12;  // continuation pages have only mini-header + footer
+    const chunks: (typeof params.rows)[] = [];
+    if (params.rows.length === 0) {
+        chunks.push([]);
+    } else {
+        chunks.push(params.rows.slice(0, ROWS_P1));
+        let i = ROWS_P1;
+        while (i < params.rows.length) {
+            chunks.push(params.rows.slice(i, i + ROWS_CONT));
+            i += ROWS_CONT;
+        }
+    }
+
+    // ── Shared table header ───────────────────────────────────────────────
+    const thStyle = 'padding:9px 6px;color:#fff;font-size:9px;font-weight:600;font-family:system-ui,sans-serif;letter-spacing:.3px;';
+    const tHead = `
+      <thead><tr style="background:#004F7F;">
+        <th style="${thStyle}text-align:center;width:3%;">#</th>
+        <th style="${thStyle}text-align:left;width:11%;">Date</th>
+        <th style="${thStyle}text-align:center;width:8%;">Scan</th>
+        <th style="${thStyle}text-align:center;width:8%;">Mask</th>
+        <th style="${thStyle}text-align:left;width:19%;">Analysis Result</th>
+        <th style="${thStyle}text-align:center;width:10%;">Location</th>
+        <th style="${thStyle}text-align:center;width:9%;">Platform</th>
+        <th style="${thStyle}text-align:center;width:13%;">Confidence</th>
+        <th style="${thStyle}text-align:center;width:19%;">Severity</th>
+      </tr></thead>`;
+
+    // ── Row builder ───────────────────────────────────────────────────────
+    const buildRows = (rows: typeof params.rows) => rows.map((row, ri) => {
+        const accent    = getDiseaseAccent(row.analysis);
+        const confColor = getConfColor(row.confidence);
+        const sev       = getSeverity(row.analysis);
+        const a         = row.analysis.toUpperCase();
+        const isDanger  = a.includes('MEL') || a.includes('BCC') || a.includes('SCC') || a.includes('AKIEC');
+        const isSafe    = a.includes('NV') || a.includes('BKL') || a.includes('NEVUS');
+        const sevText   = isDanger ? 'DANGEROUS' : isSafe ? 'SAFE' : 'MONITOR';
+        const conf      = row.confidence > 0 ? `${row.confidence.toFixed(1)}%` : 'N/A';
+        const confWidth = row.confidence > 0 ? Math.min(row.confidence, 100) : 0;
+        const rowBg     = ri % 2 === 0 ? '#ffffff' : '#F4FBFF';
+        const td        = `padding:7px 6px;vertical-align:middle;`;
+        return `<tr style="background:${rowBg};border-bottom:1px solid #E5F0F6;">
+          <td style="${td}text-align:center;font-size:11px;font-weight:bold;color:#004F7F;font-family:system-ui,sans-serif;">${row.index}</td>
+          <td style="${td}font-size:8px;color:#374151;font-family:system-ui,sans-serif;line-height:1.3;">${row.date}</td>
+          <td style="${td}text-align:center;">${row.imageBase64
+            ? `<img src="${row.imageBase64}" style="width:46px;height:46px;border-radius:7px;object-fit:cover;display:block;margin:0 auto;box-shadow:0 1px 5px rgba(0,0,0,0.18);"/>`
+            : `<div style="width:46px;height:46px;border-radius:7px;border:1.5px dashed #C5E3ED;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:8px;margin:0 auto;background:#F4FBFF;font-family:system-ui,sans-serif;">N/A</div>`}</td>
+          <td style="${td}text-align:center;">${row.maskBase64
+            ? `<img src="${row.maskBase64}" style="width:46px;height:46px;border-radius:7px;object-fit:contain;background:#060c10;display:block;margin:0 auto;border:1.5px solid #00A3A3;"/>`
+            : `<div style="width:46px;height:46px;border-radius:7px;border:1.5px dashed #C5E3ED;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:8px;margin:0 auto;background:#F4FBFF;font-family:system-ui,sans-serif;">N/A</div>`}</td>
+          <td style="${td}font-size:10px;font-weight:bold;color:${accent};font-family:system-ui,sans-serif;line-height:1.3;">${row.analysis || 'Unknown'}</td>
+          <td style="${td}text-align:center;">
+            <span style="display:inline-block;background:#E8F4F8;color:#004F7F;border:1px solid #C5E3ED;border-radius:5px;padding:2px 5px;font-size:8px;font-weight:600;font-family:system-ui,sans-serif;">${row.bodyView || 'N/A'}</span>
+          </td>
+          <td style="${td}text-align:center;">
+            <span style="display:inline-block;border-radius:5px;padding:2px 5px;font-size:8px;font-weight:600;font-family:system-ui,sans-serif;${isWeb(row.source) ? 'background:#E6F4EA;color:#1A6B35;border:1px solid #A8D5B5;' : 'background:#E8F4F8;color:#004F7F;border:1px solid #C5E3ED;'}">${isWeb(row.source) ? 'Web' : 'App'}</span>
+          </td>
+          <td style="${td}">
+            <div style="font-size:11px;font-weight:bold;color:${confColor};font-family:system-ui,sans-serif;text-align:center;margin-bottom:3px;">${conf}</div>
+            <div style="height:5px;background:#E5F0F6;border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${confWidth}%;background:linear-gradient(90deg,${confColor}99,${confColor});border-radius:4px;"></div>
+            </div>
+          </td>
+          <td style="${td}text-align:center;">
+            <span style="display:inline-block;padding:4px 8px;border-radius:10px;background:${sev.bg};border:1px solid ${sev.border};font-size:9px;font-weight:700;color:${sev.color};font-family:system-ui,sans-serif;letter-spacing:.3px;">${sevText}</span>
+          </td>
+        </tr>`;
+    }).join('');
+
+    // ── Reusable disclaimer & footer ──────────────────────────────────────
+    const disclaimer = `
+      <div style="padding:6px 20px 8px;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;">
+        <div style="background:#fffbeb;border-left:3px solid #fbbf24;border-radius:6px;padding:7px 12px;">
+          <p style="font-size:9.5px;color:#92400e;font-family:system-ui,sans-serif;margin:0;"><strong>Medical Disclaimer:</strong> This report is generated by an AI model for informational purposes only. Always consult a qualified dermatologist.</p>
         </div>
-      </div>
-      <div class="stats">
-        <div class="si"><div class="sv">${params.rows.length}</div><div class="sl">Total Reports</div></div>
-        <div class="si"><div class="sv">${params.rows.filter(r => r.bodyView === 'front').length}</div><div class="sl">Front Body</div></div>
-        <div class="si"><div class="sv">${params.rows.filter(r => r.bodyView === 'back').length}</div><div class="sl">Back Body</div></div>
-        <div class="si"><div class="sv">${params.rows.filter(r => !isWeb(r.source)).length}</div><div class="sl">App Scans</div></div>
-        <div class="si"><div class="sv">${params.rows.filter(r => isWeb(r.source)).length}</div><div class="sl">Web Scans</div></div>
-      </div>
-      <div class="tsec">
-        <div class="section-title" style="margin-bottom: 16px;">📋 Scan History Table</div>
-        <table>
-          <thead>
-            <tr>
-              <th style="width:40px">#</th>
-              <th style="width:80px; text-align:center;">Image</th>
-              <th style="width:100px">Date</th>
-              <th style="width:80px">Location</th>
-              <th style="width:80px">Platform</th>
-              <th style="width:200px">Description</th>
-              <th>Analysis Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${params.rows.map(row => `
-            <tr>
-              <td class="tnum">${row.index}</td>
-              <td class="timg">${row.imageBase64 ? `<img src="${row.imageBase64}"/>` : `<div class="timg-ph">No Image</div>`}</td>
-              <td class="tdate">${row.date}</td>
-              <td><span class="loc-badge">${row.bodyView || 'N/A'}</span></td>
-              <td><span class="plat-badge ${isWeb(row.source) ? 'plat-web' : 'plat-app'}">${isWeb(row.source) ? 'Web' : 'App'}</span></td>
-              <td class="tdesc">${row.description || 'N/A'}</td>
-              <td class="tanal">${row.analysis || 'Pending...'}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div class="warning-section">
-        <div class="warning-box yellow">
-          <p class="warning-text">⚠️ <strong>Medical Disclaimer:</strong> This report is generated by an AI model and is for informational purposes only. Always consult a qualified dermatologist.</p>
-        </div>
-      </div>
-      <div class="footer">
+      </div>`;
+
+    const footer = `
+      <div class="footer" style="padding:10px 20px;flex-shrink:0;">
         <div class="footer-divider"></div>
-        <div class="footer-brand"><span class="footer-s">S</span>kinSight</div>
+        <div class="footer-brand" style="font-size:14px;"><span class="footer-s">S</span>kinSight</div>
         <div class="footer-copy">© 2026 SkinSight — Graduation Project · Faculty of Computers &amp; AI</div>
         <div class="footer-email">📧 skinsight.help.2025@gmail.com</div>
+      </div>`;
+
+    // ── Page 1 ────────────────────────────────────────────────────────────
+    let pages = `
+    <div class="page summary" style="height:1122px;overflow:hidden;display:flex;flex-direction:column;background:#D8E9F0;">
+
+      <div class="header" style="padding:12px 24px 8px;flex-shrink:0;">
+        <div class="brand" style="font-size:28px;"><span class="brand-s">S</span>kinSight</div>
+        <div class="tagline" style="font-size:10px;margin-top:2px;">Snap · Detect · Protect</div>
+        <div class="divider" style="margin:5px auto 0;"></div>
       </div>
+
+      <div class="banner" style="padding:4px 20px;flex-shrink:0;"><p style="font-size:11px;">Complete Skin Analysis Summary</p></div>
+
+      <div style="flex-shrink:0;padding:7px 20px;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;font-weight:bold;color:#004F7F;font-family:Georgia,serif;">All Reports — Full History</div>
+        <div style="font-size:9.5px;color:#6B7280;font-family:system-ui,sans-serif;">Generated: ${params.generatedDate}</div>
+      </div>
+
+      <div style="flex-shrink:0;padding:7px 20px 8px;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;border-top:1px solid #E5F0F6;">
+        <div style="font-size:10px;font-weight:bold;color:#004F7F;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:system-ui,sans-serif;">Patient Information</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:5px;">
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Name</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">${params.patientName || 'N/A'}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Gender</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;text-transform:capitalize;">${params.gender || 'N/A'}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Age</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">${age}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Date of Birth</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">${dob}</div></div>
+          <div style="background:#F4FBFF;border-radius:6px;padding:5px 8px;border:1px solid #C5E3ED;"><div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;font-family:system-ui,sans-serif;">Skin Tone</div><div style="font-size:10px;font-weight:bold;color:#1F2937;font-family:system-ui,sans-serif;">N/A</div></div>
+        </div>
+      </div>
+
+      <div style="flex-shrink:0;background:#004F7F;padding:10px 24px;display:flex;justify-content:space-around;align-items:center;">
+        <div style="text-align:center;"><div style="font-size:20px;font-weight:bold;color:#00A3A3;font-family:Georgia,serif;">${params.rows.length}</div><div style="font-size:8.5px;color:#C5E3ED;font-family:system-ui,sans-serif;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;">Total</div></div>
+        <div style="text-align:center;"><div style="font-size:20px;font-weight:bold;color:#00A3A3;font-family:Georgia,serif;">${params.rows.filter(r => (r.bodyView||'').toLowerCase().includes('front')).length}</div><div style="font-size:8.5px;color:#C5E3ED;font-family:system-ui,sans-serif;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;">Front</div></div>
+        <div style="text-align:center;"><div style="font-size:20px;font-weight:bold;color:#00A3A3;font-family:Georgia,serif;">${params.rows.filter(r => (r.bodyView||'').toLowerCase().includes('back')).length}</div><div style="font-size:8.5px;color:#C5E3ED;font-family:system-ui,sans-serif;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;">Back</div></div>
+        <div style="text-align:center;"><div style="font-size:20px;font-weight:bold;color:#00A3A3;font-family:Georgia,serif;">${params.rows.filter(r => !isWeb(r.source)).length}</div><div style="font-size:8.5px;color:#C5E3ED;font-family:system-ui,sans-serif;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;">App</div></div>
+        <div style="text-align:center;"><div style="font-size:20px;font-weight:bold;color:#00A3A3;font-family:Georgia,serif;">${params.rows.filter(r => isWeb(r.source)).length}</div><div style="font-size:8.5px;color:#C5E3ED;font-family:system-ui,sans-serif;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;">Web</div></div>
+      </div>
+
+      <div style="flex:1;overflow:hidden;padding:8px 20px 0;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;border-top:1px solid #E5F0F6;">
+        <div style="font-size:10px;font-weight:bold;color:#004F7F;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-family:system-ui,sans-serif;">Scan History${chunks.length > 1 ? ` (Page 1 of ${chunks.length})` : ''}</div>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+          ${tHead}
+          <tbody>${buildRows(chunks[0] || [])}</tbody>
+        </table>
+      </div>
+
+      <div style="flex-shrink:0;">
+        ${chunks.length === 1 ? disclaimer : ''}
+        ${footer}
+      </div>
+
     </div>`;
+
+    // ── Pages 2+ ──────────────────────────────────────────────────────────
+    for (let i = 1; i < chunks.length; i++) {
+        const isLast = i === chunks.length - 1;
+        pages += `
+    <div class="page summary" style="height:1122px;overflow:hidden;display:flex;flex-direction:column;background:#D8E9F0;">
+
+      <div style="flex-shrink:0;padding:8px 20px;background:#004F7F;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:16px;color:#fff;font-weight:bold;font-family:Georgia,serif;"><span style="color:#00A3A3;font-size:20px;">S</span>kinSight</div>
+        <div style="color:#C5E3ED;font-size:9.5px;font-family:system-ui,sans-serif;">Page ${i + 1} of ${chunks.length} &middot; All Reports Summary</div>
+      </div>
+
+      <div style="flex:1;overflow:hidden;padding:10px 20px 0;background:#fff;border-left:1px solid #C5E3ED;border-right:1px solid #C5E3ED;">
+        <div style="font-size:10px;font-weight:bold;color:#004F7F;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-family:system-ui,sans-serif;">Scan History (continued)</div>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+          ${tHead}
+          <tbody>${buildRows(chunks[i])}</tbody>
+        </table>
+      </div>
+
+      <div style="flex-shrink:0;">
+        ${isLast ? disclaimer : ''}
+        ${footer}
+      </div>
+
+    </div>`;
+    }
+
+    return pages;
 };
 
-// ── Download Direct to Local PDF ──────────────────────────────────────────────
-const downloadPDF = async (html: string, filename: string) => {
-    // 1. We wrap everything perfectly in our scoped container
-    const fullHtml = `
-      <div class="pdf-container">
-        <style>${CSS}</style>
-        ${html}
-      </div>
-    `;
+// ── Load html2canvas + jsPDF independently (no html2pdf wrapper) ─────────────
+const loadScript = (src: string): Promise<void> =>
+    new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => resolve();
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
 
+const ensureLibs = async (): Promise<void> => {
+    const w = window as any;
+    const needCanvas = !w.html2canvas;
+    const needPdf    = !w.jspdf?.jsPDF;
+    await Promise.all([
+        needCanvas ? loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js') : Promise.resolve(),
+        needPdf    ? loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')       : Promise.resolve(),
+    ]);
+};
+
+const generateAndUploadPDF = async (
+    html: string,
+    filename: string,
+    uid: string | undefined,
+    scanId: string | undefined,
+    db: any,
+): Promise<void> => {
+    await ensureLibs();
+
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-pdf', 'true');
+    styleEl.textContent = CSS;
+    document.head.appendChild(styleEl);
+
+    const container = document.createElement('div');
+    container.className = 'pdf-container';
+    container.innerHTML = html;
+    container.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;z-index:1;pointer-events:none;';
+    document.body.appendChild(container);
+
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => requestAnimationFrame(r));
+
+    let pdfBlob: Blob;
     try {
-        if (!(window as any).html2pdf) {
-            await new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
+        const h2c = (window as any).html2canvas as (el: HTMLElement, opts: object) => Promise<HTMLCanvasElement>;
+        const { jsPDF } = (window as any).jspdf as { jsPDF: any };
+        const pdf   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+
+        // Capture the full container once
+        const full = await h2c(container, {
+            scale: 2, useCORS: true, logging: false,
+            scrollX: 0, scrollY: 0,
+            width: 794, windowWidth: 794,
+            height: container.offsetHeight,
+        });
+
+        const pageEls = Array.from(container.querySelectorAll('.page')) as HTMLElement[];
+
+        if (pageEls.length > 1) {
+            // Multi-page: crop each .page div from the full canvas
+            for (let i = 0; i < pageEls.length; i++) {
+                if (i > 0) pdf.addPage();
+                const el  = pageEls[i];
+                const top = el.offsetTop * 2;
+                const h   = el.offsetHeight * 2;
+                const crop = document.createElement('canvas');
+                crop.width  = full.width;
+                crop.height = h;
+                crop.getContext('2d')!.drawImage(full, 0, top, full.width, h, 0, 0, full.width, h);
+                pdf.addImage(crop.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageW, pageH);
+            }
+        } else {
+            // Single page: natural aspect ratio, continue to next page if content overflows
+            const imgH = (full.height / full.width) * pageW;
+            let yLeft  = imgH;
+            let yPos   = 0;
+            const imgData = full.toDataURL('image/jpeg', 0.95);
+            pdf.addImage(imgData, 'JPEG', 0, yPos, pageW, imgH);
+            yLeft -= pageH;
+            while (yLeft > 0) {
+                yPos -= pageH;
+                pdf.addPage();
+                pdf.addImage(imgData, 'JPEG', 0, yPos, pageW, imgH);
+                yLeft -= pageH;
+            }
         }
 
-        const opt = {
-            margin:       0,
-            filename:     `${filename}.pdf`,
-            image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, logging: false },
-            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
-        // 2. We pass the string directly! html2pdf will render it internally,
-        // preventing the twitch and blank image bugs entirely.
-        await (window as any).html2pdf().set(opt).from(fullHtml).save();
-
-    } catch (err) {
-        console.error(err);
-        toast.error('Direct download failed, opening print dialog...');
-        const fallbackHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${filename}</title><style>${CSS}</style></head><body><div class="pdf-container">${html}</div></body></html>`;
-        const blob = new Blob([fallbackHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const win = window.open(url, '_blank');
-        if (win) { win.onload = () => { win.print(); }; }
+        pdfBlob = pdf.output('blob');
+    } finally {
+        document.body.removeChild(container);
+        document.head.removeChild(styleEl);
     }
+
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `${filename}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+    uploadPDFToCloudinary(pdfBlob, filename).then(cloudUrl => {
+        if (cloudUrl && uid && scanId) {
+            const reportRef = doc(db, 'users', uid, 'reports', scanId);
+            setDoc(reportRef, {
+                reportUrl:   cloudUrl,
+                filename:    `${filename}.pdf`,
+                generatedAt: new Date().toISOString(),
+            }, { merge: true }).catch(() => {});
+        }
+    }).catch(() => {});
 };
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
@@ -467,37 +739,44 @@ export const Reports: React.FC = () => {
     const downloadOne = async (scan: Scan, idx: number) => {
         if (dlId || dlAll) return;
         setDlId(scan.id);
-        toast('Generating PDF...', { icon: '⏳' });
+        toast('Uploading & generating PDF…', { icon: '⏳' });
         try {
-            const imgUrl = scan.photoUri || scan.imageUrl || '';
-            const base64 = imgUrl ? await urlToBase64(imgUrl) : '';
-
+            const imgUrl  = scan.photoUri || scan.imageUrl || '';
+            const base64  = imgUrl ? await urlToBase64(imgUrl) : '';
             const maskUrl = scan.result?.segmentedUrl || scan.segmentedUrl || '';
             const maskBase64 = maskUrl ? await urlToBase64(maskUrl) : '';
-
+            const filename = `SkinSight_Report_${scans.length - idx}`;
             const params = { ...buildSingleParams(scan, idx), imageBase64: base64, maskBase64 };
-            await downloadPDF(buildReportHTML(params), `SkinSight_Report_${scans.length - idx}`);
-            toast.success('Report downloaded successfully!');
-        } catch { toast.error('Failed to generate report'); }
+            await generateAndUploadPDF(buildReportHTML(params), filename, user?.uid, scan.id, db);
+            toast.success('Report downloaded!');
+        } catch (e: any) {
+            console.error(e);
+            toast.error('Failed to generate report');
+        }
         finally { setDlId(null); }
     };
 
     const downloadAll = async () => {
         if (dlId || dlAll || scans.length === 0) return;
         setDlAll(true);
-        toast('Generating Summary PDF...', { icon: '⏳' });
+        toast('Generating Summary PDF…', { icon: '⏳' });
         try {
             const rows = await Promise.all(scans.map(async (scan, idx) => {
-                const imgUrl = scan.photoUri || scan.imageUrl || '';
-                const base64 = imgUrl ? await urlToBase64(imgUrl) : '';
+                const imgUrl  = scan.photoUri || scan.imageUrl || '';
+                const maskUrl = scan.result?.segmentedUrl || scan.segmentedUrl || '';
+                const [base64, maskBase64] = await Promise.all([
+                    imgUrl  ? urlToBase64(imgUrl)  : Promise.resolve(''),
+                    maskUrl ? urlToBase64(maskUrl) : Promise.resolve(''),
+                ]);
                 return {
-                    index: scans.length - idx,
-                    date: formatDate(scan.createdAt || scan.timestamp),
-                    bodyView: scan.bodyView || 'N/A',
-                    analysis: scan.result?.disease || scan.analysis || scan.disease || 'Unknown condition',
-                    description: scan.result?.description || scan.description || 'N/A',
-                    source: scan.source || 'mobile',
-                    imageBase64: base64
+                    index:       scans.length - idx,
+                    date:        formatDate(scan.createdAt || scan.timestamp),
+                    bodyView:    scan.bodyView || 'N/A',
+                    analysis:    scan.result?.disease || scan.analysis || scan.disease || 'Unknown condition',
+                    confidence:  scan.result?.confidence ?? scan.confidence ?? 0,
+                    source:      scan.source || 'mobile',
+                    imageBase64: base64,
+                    maskBase64,
                 };
             }));
 
@@ -512,9 +791,12 @@ export const Reports: React.FC = () => {
                 birthDay: userProfile?.birthDay,
             };
 
-            await downloadPDF(buildAllReportsHTML(params), 'SkinSight_All_Reports_Summary');
-            toast.success('Summary report downloaded successfully!');
-        } catch { toast.error('Failed to generate summary report'); }
+            await generateAndUploadPDF(buildAllReportsHTML(params), 'SkinSight_All_Reports_Summary', user?.uid, 'summary', db);
+            toast.success('Summary report downloaded!');
+        } catch (e: any) {
+            console.error(e);
+            toast.error('Failed to generate summary report');
+        }
         finally { setDlAll(false); }
     };
 
@@ -583,7 +865,7 @@ export const Reports: React.FC = () => {
 
             {/* Chart */}
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                        className="rounded-2xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                        className="rounded-2xl p-6 overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                 <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
                     <div className="flex items-center gap-2">
                         <h2 className="text-lg font-extrabold" style={{ color: 'var(--tx)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
@@ -614,36 +896,39 @@ export const Reports: React.FC = () => {
                         </button>
                     </div>
                 ) : (
-                    <div className="h-72">
+                    <div className="h-96 sm:h-72">
                         <ResponsiveContainer width="100%" height="100%">
                             {chartType === 'pie' ? (
-                                <PieChart>
-                                    <Pie data={chartData} cx="50%" cy="50%" innerRadius={40} outerRadius={60}
+                                <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                    <Pie data={chartData} cx="50%" cy="50%" innerRadius={38} outerRadius={55}
                                          paddingAngle={4} dataKey="value"
                                          label={({ cx, cy, midAngle, outerRadius, name, percent, fill }) => {
                                              const RADIAN = Math.PI / 180;
-                                             const radius = outerRadius + 12;
+                                             const radius = outerRadius + 14;
                                              // @ts-ignore
                                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
                                              // @ts-ignore
                                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                             const abbr = name.match(/\(([A-Z]+)\)/)?.[1] ?? name.split(' ')[0].slice(0, 5);
                                              return (
-                                                 <text x={x} y={y} fill={fill} fontSize="11" fontWeight="bold" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
-                                                     {`${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                                 <text x={x} y={y} fill={fill} fontSize="10" fontWeight="bold" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                                                     {`${abbr} ${((percent || 0) * 100).toFixed(0)}%`}
                                                  </text>
                                              );
                                          }}
                                          labelLine={{ stroke: 'var(--tx3)', strokeWidth: 1 }}>
                                         {chartData.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>)}
                                     </Pie>
-                                    <Tooltip contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--br)', borderRadius: '12px', color: 'var(--tx)' }}/>
+                                    <Tooltip contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--br)', borderRadius: '12px', color: 'var(--tx)' }}
+                                             formatter={(value, name) => [value, name]}/>
                                     <Legend/>
                                 </PieChart>
                             ) : (
-                                <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                                <BarChart data={chartData} margin={{ top: 5, right: 10, bottom: 60, left: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--br)"/>
-                                    <XAxis dataKey="name" tick={{ fill: 'var(--tx3)', fontSize: 11 }} axisLine={false}/>
-                                    <YAxis tick={{ fill: 'var(--tx3)', fontSize: 11 }} axisLine={false}/>
+                                    <XAxis dataKey="name" tick={{ fill: 'var(--tx3)', fontSize: 9 }} axisLine={false}
+                                           angle={-35} textAnchor="end" height={60} interval={0}/>
+                                    <YAxis tick={{ fill: 'var(--tx3)', fontSize: 10 }} axisLine={false}/>
                                     <Tooltip contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--br)', borderRadius: '12px', color: 'var(--tx)' }}/>
                                     <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                                         {chartData.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>)}
@@ -679,9 +964,9 @@ export const Reports: React.FC = () => {
                                         className="rounded-2xl overflow-hidden"
                                         style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
                                 <div className="flex gap-4 p-4 sm:p-5">
-                                    {/* Thumbnail */}
+                                    {/* Thumbnail: original scan */}
                                     {imgUrl && (
-                                        <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden"
+                                        <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0"
                                              style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
                                             <img src={imgUrl} alt={condition} className="w-full h-full object-cover"
                                                  onError={e => { e.currentTarget.src = 'https://placehold.co/80x80/0f172a/00e5ff?text=N/A'; }}/>

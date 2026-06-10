@@ -109,7 +109,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithPopup(auth, facebookProvider);
       toast.success('Logged in with Facebook');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to login with Facebook');
+      if (error.code === 'auth/account-exists-with-different-credential') {
+        toast.error('An account already exists with this email. Try signing in with Google or email instead.');
+      } else if (error.code === 'auth/popup-blocked') {
+        toast.error('Popup was blocked. Please allow popups for this site and try again.');
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup — silent, no toast needed
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // Another popup was opened — silent
+      } else if (error.code === 'auth/operation-not-allowed') {
+        toast.error('Facebook login is not enabled. Please contact support.');
+      } else {
+        toast.error(error.message || 'Failed to login with Facebook');
+      }
     }
   };
 
