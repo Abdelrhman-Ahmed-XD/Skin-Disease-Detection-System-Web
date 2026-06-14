@@ -237,7 +237,7 @@ export const ResetPassword: React.FC = () => {
 
                       <button type="submit" disabled={otp.join('').length < 6}
                               className="btn-accent w-full py-3.5 rounded-xl text-base font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all duration-300">
-                        Verify code →
+                        Verify code
                       </button>
                     </form>
                   </motion.div>
@@ -311,7 +311,7 @@ export const ResetPassword: React.FC = () => {
                       </p>
                     </div>
                     <button onClick={() => navigate('/login')} className="btn-accent w-full py-4 rounded-xl text-base font-bold transition-all duration-300">
-                      Go to sign in →
+                      Go to sign in
                     </button>
                   </motion.div>
               )}

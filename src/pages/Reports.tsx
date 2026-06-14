@@ -814,7 +814,7 @@ export const Reports: React.FC = () => {
             </div>
             <h2 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Sign up for reports</h2>
             <p style={{ color: 'var(--tx2)' }}>Create an account to see charts and download PDF reports of your scans.</p>
-            <button onClick={() => navigate('/signup')} className="btn-accent px-6 py-3 rounded-xl text-sm">Create free account →</button>
+            <button onClick={() => navigate('/signup')} className="btn-accent px-6 py-3 rounded-xl text-sm">Create free account</button>
         </div>
     );
 
@@ -892,7 +892,7 @@ export const Reports: React.FC = () => {
                         <TrendingUp size={32} className="mx-auto mb-3" style={{ color: 'var(--tx3)' }}/>
                         <p className="text-sm" style={{ color: 'var(--tx3)' }}>No data yet. Run some scans to see your report.</p>
                         <button onClick={() => navigate('/dashboard')} className="btn-accent mt-4 px-5 py-2 rounded-xl text-sm">
-                            Start scanning →
+                            Start scanning
                         </button>
                     </div>
                 ) : (

@@ -374,7 +374,7 @@ export const History: React.FC = () => {
         <div className="max-w-md mx-auto text-center py-20 space-y-5">
             <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}><ShieldCheck size={36}/></div>
             <h2 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Sign up to view history</h2>
-            <button onClick={() => navigate('/signup')} className="btn-accent px-6 py-3 rounded-xl text-sm">Create free account →</button>
+            <button onClick={() => navigate('/signup')} className="btn-accent px-6 py-3 rounded-xl text-sm">Create free account</button>
         </div>
     );
 

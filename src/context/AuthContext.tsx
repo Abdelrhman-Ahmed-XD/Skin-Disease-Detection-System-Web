@@ -13,6 +13,8 @@ export interface UserProfile {
   photoUri: string;
   gender: string;
   skinColor: string;
+  eyeColor?: string;
+  hairColor?: string;
   darkMode: boolean;
   isEmailVerified: boolean;
   createdAt: string;

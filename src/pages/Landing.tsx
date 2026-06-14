@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Brain, ShieldCheck, History, Zap, Eye, Scan, Upload, Cpu, BarChart2 } from 'lucide-react';
+import { Brain, ShieldCheck, History, Zap, Eye, Scan, Upload, Cpu, BarChart2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { HeroCard } from '../components/HeroCard';
 import { FloatingMoles, FloatingMolesPage, FloatingMolesMobile, FloatingMolesHeroMobile } from '../components/FloatingMoles';
@@ -161,7 +161,7 @@ export const Landing: React.FC = () => {
               <div className="flex flex-wrap gap-3">
                 <Link to={loggedIn ? '/dashboard' : '/signup'}
                       className="btn-accent px-5 py-2.5 rounded-xl text-sm inline-flex items-center gap-2">
-                  {loggedIn ? 'Open dashboard' : 'Start for free'}<ArrowRight size={14}/>
+                  {loggedIn ? 'Open dashboard' : 'Start for free'}
                 </Link>
                 <button onClick={handleGuest} className="btn-ghost px-5 py-2.5 rounded-xl text-sm">
                   Try as Guest
@@ -290,7 +290,7 @@ export const Landing: React.FC = () => {
               <Link to="/signup"
                     className="px-5 py-2.5 rounded-xl text-sm font-bold inline-flex items-center gap-1.5 transition-all hover:-translate-y-0.5"
                     style={{ background: '#070d1a', color: '#00e5ff' }}>
-                Create free account <ArrowRight size={13}/>
+                Create free account
               </Link>
               <button onClick={handleGuest}
                       className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5"

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import toast from 'react-hot-toast';
-import { Mail, Lock, LogIn, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Login: React.FC = () => {
@@ -136,7 +136,6 @@ export const Login: React.FC = () => {
                     style={{ background: 'var(--accent-dim)', color: 'var(--tx2)', border: '1px solid var(--br)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-dim)'; e.currentTarget.style.borderColor = 'var(--br)'; }}>
-              <ArrowRight size={14} />
               Continue as Guest <span className="text-xs opacity-60">(1 free scan)</span>
             </button>
           </div>

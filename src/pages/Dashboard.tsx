@@ -8,6 +8,7 @@ import {
 import { uploadImage } from '../services/cloudinary';
 import { predictSkinDisease } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useChatVisibility } from '../context/ChatVisibilityContext';
 import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -59,6 +60,13 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
   };
 
   useEffect(() => { startCamera(facing); return () => { stream?.getTracks().forEach(t => t.stop()); }; }, []);
+
+  // Re-attach stream to video after retake — video element remounts when preview clears
+  useEffect(() => {
+    if (!preview && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [preview, stream]);
 
   const flip = () => {
     const next = facing === 'environment' ? 'user' : 'environment';
@@ -259,7 +267,7 @@ const CameraModal: React.FC<{ onCapture: (file: File) => void; onClose: () => vo
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--br2)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--tx2)'; }}
                 >
-                  ↩ Retake
+                  Retake
                 </button>
                 <button
                     onClick={confirm}
@@ -308,6 +316,7 @@ const TipCard: React.FC = () => {
 
 export const Dashboard: React.FC = () => {
   const { user, userProfile, isGuest } = useAuth();
+  const { setChatHidden } = useChatVisibility();
   const [file, setFile]               = useState<File | null>(null);
   const [preview, setPreview]         = useState<string | null>(null);
   const [loading, setLoading]         = useState(false);
@@ -342,6 +351,12 @@ export const Dashboard: React.FC = () => {
     }, 25);
     return () => clearInterval(iv);
   }, [result]);
+
+  // Hide chatbot when camera is open or an image is loaded for preview/analysis
+  useEffect(() => {
+    setChatHidden(showCamera || !!file);
+    return () => setChatHidden(false);
+  }, [showCamera, file, setChatHidden]);
 
   const analyzeFile = useCallback(async (selectedFile: File, photoType: 'phone' | 'dermo') => {
     if (isGuest && hasScanned) { toast.error('Guest limit reached. Create a free account to scan more.'); return; }
@@ -693,7 +708,7 @@ export const Dashboard: React.FC = () => {
                                 (e.currentTarget as HTMLButtonElement).style.color = 'var(--tx)';
                               }}
                           >
-                            ↩ Scan another image
+                            Scan another image
                           </motion.button>
                         </motion.div>
                     )}

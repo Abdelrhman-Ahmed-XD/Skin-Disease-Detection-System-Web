@@ -174,8 +174,8 @@ export const Profile: React.FC = () => {
     setBirthMonth(String(userProfile.birthMonth || ''));
     setBirthYear(String(userProfile.birthYear || ''));
     setSkinColor(userProfile.skinColor || '');
-    setEyeColor((userProfile as any).eyeColor || '');
-    setHairColor((userProfile as any).hairColor || '');
+    setEyeColor(userProfile.eyeColor || '');
+    setHairColor(userProfile.hairColor || '');
   }, [userProfile]);
 
   useEffect(() => {
@@ -404,7 +404,7 @@ export const Profile: React.FC = () => {
         <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}><ShieldCheck size={36}/></div>
         <h2 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Create an account</h2>
         <p style={{ color: 'var(--tx2)' }}>Sign up for free to access your profile, save scans, and more.</p>
-        <button onClick={() => navigate('/signup')} className="btn-accent px-6 py-3 rounded-xl text-sm">Create free account →</button>
+        <button onClick={() => navigate('/signup')} className="btn-accent px-6 py-3 rounded-xl text-sm">Create free account</button>
       </div>
   );
 

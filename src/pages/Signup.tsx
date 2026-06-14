@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User as UserIcon, Eye, EyeOff, UserPlus, Check, ArrowRight, RefreshCw } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, Eye, EyeOff, UserPlus, Check, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
@@ -355,7 +355,7 @@ export const Signup: React.FC = () => {
                       <p className="text-base leading-relaxed" style={{ color: 'var(--tx2)' }}>Your email has been verified and your account is ready to use.</p>
                     </div>
                     <button onClick={() => navigate('/dashboard')} className="btn-accent w-full py-4 rounded-xl text-base font-bold flex items-center justify-center gap-2">
-                      Go to Dashboard <ArrowRight size={18}/>
+                      Go to Dashboard
                     </button>
                   </motion.div>
               )}

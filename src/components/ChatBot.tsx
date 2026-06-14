@@ -271,6 +271,73 @@ export const ChatBot: React.FC = () => {
   const inputRef   = useRef<HTMLInputElement>(null);
   const btnRef     = useRef<HTMLButtonElement>(null);
 
+  // ── Drag state ──
+  const btnPx = typeof window !== 'undefined' && window.innerWidth < 768 ? 50 : 56;
+  const btnMargin = 24;
+  const [pos, setPos] = useState(() => ({
+    x: typeof window !== 'undefined' ? window.innerWidth - (window.innerWidth < 768 ? 50 : 56) - 24 : 0,
+    y: typeof window !== 'undefined' ? window.innerHeight - (window.innerWidth < 768 ? 50 : 56) - 24 : 0,
+  }));
+  const dragRef = useRef({ origX: 0, origY: 0, startMX: 0, startMY: 0, active: false, moved: false });
+
+  const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    // Drag only on mobile viewports
+    if (window.innerWidth >= 768) return;
+    dragRef.current = { origX: pos.x, origY: pos.y, startMX: e.clientX, startMY: e.clientY, active: true, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current.active) return;
+    const dx = e.clientX - dragRef.current.startMX;
+    const dy = e.clientY - dragRef.current.startMY;
+    if (Math.abs(dx) + Math.abs(dy) > 5) dragRef.current.moved = true;
+    setPos({
+      x: Math.max(0, Math.min(window.innerWidth - btnPx, dragRef.current.origX + dx)),
+      y: Math.max(0, Math.min(window.innerHeight - btnPx, dragRef.current.origY + dy)),
+    });
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    dragRef.current.active = false;
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+  };
+
+  const handleBtnClick = () => {
+    if (dragRef.current.moved) { dragRef.current.moved = false; return; }
+    // Reset to original bottom-right position on every click
+    setPos({ x: window.innerWidth - btnPx - btnMargin, y: window.innerHeight - btnPx - btnMargin });
+    setOpen(o => !o);
+  };
+
+  const getPanelStyle = (): React.CSSProperties => {
+    const W = typeof window !== 'undefined' ? window.innerWidth : 1440;
+    const H = typeof window !== 'undefined' ? window.innerHeight : 900;
+    const panelW = Math.max(300, Math.min(400, W * 0.92));
+    const panelH = Math.max(440, Math.min(580, H * 0.72));
+    const btnSize = btnPx;
+    const gap = 12;
+
+    // Prefer opening above the button; fall back to below if not enough space
+    let top = pos.y - gap - panelH;
+    if (top < 8) top = Math.min(H - panelH - 8, pos.y + btnSize + gap);
+
+    // Right-align panel with button right edge, clamp to viewport
+    let left = pos.x + btnSize - panelW;
+    left = Math.max(8, Math.min(W - panelW - 8, left));
+
+    return {
+      position: 'fixed',
+      top: Math.max(8, top),
+      left,
+      width: panelW,
+      height: 'clamp(440px, 72vh, 580px)',
+      zIndex: 9998,
+      background: 'var(--surface)',
+      border: '1px solid var(--br)',
+    };
+  };
+
   useEffect(() => {
     if (open) { setUnread(0); setTimeout(() => inputRef.current?.focus(), 200); }
   }, [open]);
@@ -338,24 +405,31 @@ export const ChatBot: React.FC = () => {
 
   return (
     <>
-      {/* ── Floating button */}
+      {/* ── Floating button (draggable) */}
       <button
         ref={btnRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-14 h-14 rounded-full flex items-center justify-center shadow-2xl"
+        onClick={handleBtnClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => { dragRef.current.active = false; }}
+        className="rounded-full flex items-center justify-center shadow-2xl"
         style={{
-          position: 'fixed', bottom: '24px', right: '24px',
+          position: 'fixed',
+          left: pos.x,
+          top: pos.y,
+          width: btnPx,
+          height: btnPx,
           background: 'var(--accent)', color: '#070d1a',
-          zIndex: 9999, border: 'none', cursor: 'pointer',
-          transition: 'transform 0.15s ease',
-          touchAction: 'manipulation',
+          zIndex: 9999, border: 'none',
+          cursor: window.innerWidth < 768 ? 'grab' : 'pointer',
+          touchAction: 'none',
+          userSelect: 'none',
         }}
-        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
-        onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
         aria-label="Open SkinSight Assistant"
       >
-        {open ? <X size={22} style={{ pointerEvents: 'none' }}/> : <MessageCircle size={22} style={{ pointerEvents: 'none' }}/>}
+        {open ? <X size={btnPx < 56 ? 18 : 22} style={{ pointerEvents: 'none' }}/> : <MessageCircle size={btnPx < 56 ? 18 : 22} style={{ pointerEvents: 'none' }}/>}
         {!open && unread > 0 && (
           <span style={{
             position: 'absolute', top: '-4px', right: '-4px',
@@ -376,14 +450,8 @@ export const ChatBot: React.FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.95 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed bottom-24 right-6 flex flex-col rounded-2xl overflow-hidden shadow-2xl"
-            style={{
-              zIndex: 9998,
-              width: 'clamp(300px, 92vw, 400px)',
-              height: 'clamp(440px, 72vh, 580px)',
-              background: 'var(--surface)',
-              border: '1px solid var(--br)',
-            }}
+            className="flex flex-col rounded-2xl overflow-hidden shadow-2xl"
+            style={getPanelStyle()}
           >
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"

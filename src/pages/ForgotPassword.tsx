@@ -157,7 +157,7 @@ export const ForgotPassword: React.FC = () => {
 
                     <Link to="/reset-password"
                           className="btn-accent w-full py-4 rounded-xl text-base font-bold flex items-center justify-center gap-2 transition-all duration-300">
-                      Enter reset code →
+                      Enter reset code
                     </Link>
 
                     <div className="flex flex-col items-center justify-center mt-4">

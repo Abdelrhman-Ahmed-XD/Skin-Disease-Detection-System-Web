@@ -4,16 +4,18 @@ import { Navbar } from './Navbar';
 import { Toaster } from 'react-hot-toast';
 import { useTheme } from '../context/ThemeContext';
 import { ChatBot } from './ChatBot';
+import { ChatVisibilityProvider, useChatVisibility } from '../context/ChatVisibilityContext';
 
-export const Layout: React.FC = () => {
+const LayoutInner: React.FC = () => {
     const { theme } = useTheme();
+    const { chatHidden } = useChatVisibility();
     return (
         <div className="flex min-h-screen flex-col" style={{ background: 'var(--bg)', color: 'var(--tx)' }}>
             <Navbar />
             <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                 <Outlet />
             </main>
-            <ChatBot />
+            {!chatHidden && <ChatBot />}
             <Toaster
                 position="top-right"
                 toastOptions={{
@@ -35,3 +37,9 @@ export const Layout: React.FC = () => {
         </div>
     );
 };
+
+export const Layout: React.FC = () => (
+    <ChatVisibilityProvider>
+        <LayoutInner />
+    </ChatVisibilityProvider>
+);
