@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { collection, query, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { Calendar, ShieldCheck, X, Trash2, ZoomIn,  AlertCircle, Monitor, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +31,7 @@ interface Scan {
     y?: number;
     source?: string;
     reportNum?: number;
+    isDeleted?: boolean;
 
     // The new nested structure
     result?: ScanResult;
@@ -323,40 +324,35 @@ export const History: React.FC = () => {
     const [deleteTarget, setDeleteTarget] = useState<Scan | null>(null);
     const [filter, setFilter]     = useState('');
 
-    const loadScans = async () => {
-        if (!user) return;
-        setLoading(true);
-        try {
-            const q = query(collection(db, 'users', user.uid, 'scans'));
-            const snap = await getDocs(q);
-            const docs = snap.docs.map(d => {
-                const data = d.data();
-                return {
-                    id: d.id,
-                    ...data,
-                    source: data.source || 'mobile',
-                } as Scan;
-            });
+    useEffect(() => {
+        if (isGuest || !user) { setLoading(false); return; }
+
+        const q = query(collection(db, 'users', user.uid, 'scans'));
+        const unsubscribe = onSnapshot(q, (snap) => {
+            const docs = snap.docs
+                .map(d => {
+                    const data = d.data();
+                    return { id: d.id, ...data, source: data.source || 'mobile' } as Scan;
+                })
+                .filter(d => !d.isDeleted);
 
             docs.sort((a, b) => toMs(b.createdAt || b.timestamp) - toMs(a.createdAt || a.timestamp));
 
             const docsWithNum = docs.map((d, i) => ({ ...d, reportNum: docs.length - i }));
-
             setScans(docsWithNum);
-        } catch (e) { console.error(e); }
-        finally { setLoading(false); }
-    };
+            setLoading(false);
+        }, (e) => { console.error(e); setLoading(false); });
 
-    useEffect(() => {
-        if (isGuest || !user) { setLoading(false); return; }
-        loadScans();
+        return () => unsubscribe();
     }, [user, isGuest]);
 
     const confirmDelete = async () => {
         if (!deleteTarget || !user) return;
         try {
-            await deleteDoc(doc(db, 'users', user.uid, 'scans', deleteTarget.id));
-            setScans(prev => prev.filter(s => s.id !== deleteTarget.id));
+            await updateDoc(doc(db, 'users', user.uid, 'scans', deleteTarget.id), {
+                isDeleted: true,
+                deletedAt: serverTimestamp(),
+            });
             toast.success('Scan deleted');
             if (selected?.id === deleteTarget.id) setSelected(null);
             setDeleteTarget(null);
