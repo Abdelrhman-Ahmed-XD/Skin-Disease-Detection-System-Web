@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { doc, updateDoc, collection, query, getCountFromServer } from 'firebase/firestore';
 import {
   updateProfile, EmailAuthProvider, reauthenticateWithCredential,
-  updatePassword, sendEmailVerification, verifyBeforeUpdateEmail,
+  updatePassword, sendEmailVerification, updateEmail,
 } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useNavigate } from 'react-router-dom';
@@ -349,7 +349,11 @@ export const Profile: React.FC = () => {
 
     setSavingEmail(true);
     try {
-      await verifyBeforeUpdateEmail(auth.currentUser!, newEmail.trim());
+      // Re-authenticate to ensure a fresh session, then update email directly.
+      // OTP already verified ownership of the new address, so no secondary link is needed.
+      const cred = EmailAuthProvider.credential(user!.email!, emailPw);
+      await reauthenticateWithCredential(auth.currentUser!, cred);
+      await updateEmail(auth.currentUser!, newEmail.trim());
       await updateDoc(doc(db, 'users', user!.uid), { email: newEmail.trim(), updatedAt: new Date().toISOString() });
       setEmailSent(true);
       setStepEmail('form');
@@ -385,7 +389,7 @@ export const Profile: React.FC = () => {
 
   const handleLogout = async () => { await logout(); navigate('/'); };
 
-  const fullName  = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
+  const fullName  = userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : '';
   const initials  = userProfile ? `${userProfile.firstName?.[0] || ''}${userProfile.lastName?.[0] || ''}`.toUpperCase() : 'U';
   const providers = user?.providerData.map(p => p.providerId) || [];
   const isEmailProvider = providers.includes('password');

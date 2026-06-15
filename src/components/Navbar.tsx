@@ -28,7 +28,11 @@ export const Navbar: React.FC = () => {
     { name: 'Reports', path: '/reports',   icon: BarChart2 },
   ];
   const isActive = (p: string) => location.pathname === p;
-  const firstName = userProfile?.firstName || user?.displayName?.split(' ')[0] || (isGuest ? 'Guest' : '');
+  const firstName = userProfile?.firstName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || (isGuest ? 'Guest' : '');
+  const initials = (
+    (userProfile?.firstName?.[0] || firstName[0] || '').toUpperCase() +
+    (userProfile?.lastName?.[0] || '').toUpperCase()
+  ) || '?';
 
   const navBg = scrolled
       ? (theme === 'dark' ? 'rgba(7,13,26,0.92)' : 'rgba(246,248,252,0.92)')
@@ -141,7 +145,7 @@ export const Navbar: React.FC = () => {
                       ) : (
                         <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                              style={{ background: 'var(--accent)', color: '#070d1a' }}>
-                          {firstName.charAt(0).toUpperCase()}
+                          {initials}
                         </div>
                       )}
                       <span>{firstName}</span>
