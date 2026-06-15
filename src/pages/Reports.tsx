@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, query, getDocsFromServer, doc, setDoc } from 'firebase/firestore';
 import { uploadPDFToCloudinary } from '../services/cloudinary';
 import { TrendingUp, ShieldCheck, Activity, Layers, Download, FileText, Info, Cloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -699,25 +699,36 @@ export const Reports: React.FC = () => {
     useEffect(() => {
         if (isGuest || !user) { setLoading(false); return; }
 
-        const q = query(collection(db, 'users', user.uid, 'scans'));
-        const unsubscribe = onSnapshot(q, (snap) => {
-            const docs = snap.docs
-                .map(d => ({ id: d.id, ...d.data() } as Scan))
-                .filter(d => !d.isDeleted);
+        let cancelled = false;
 
-            docs.sort((a, b) => toMs(b.createdAt || b.timestamp) - toMs(a.createdAt || a.timestamp));
+        const fetchScans = async () => {
+            try {
+                const q = query(collection(db, 'users', user.uid, 'scans'));
+                const snap = await getDocsFromServer(q);
+                if (cancelled) return;
 
-            setScans(docs);
-            const freq: Record<string, number> = {};
-            docs.forEach(s => {
-                const name = s.result?.disease || s.analysis || s.disease || 'Unknown condition';
-                freq[name] = (freq[name] || 0) + 1;
-            });
-            setChartData(Object.entries(freq).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value));
-            setLoading(false);
-        }, (e) => { console.error(e); setLoading(false); });
+                const docs = snap.docs
+                    .map(d => ({ id: d.id, ...d.data() } as Scan))
+                    .filter(d => !d.isDeleted);
 
-        return () => unsubscribe();
+                docs.sort((a, b) => toMs(b.createdAt || b.timestamp) - toMs(a.createdAt || a.timestamp));
+
+                setScans(docs);
+                const freq: Record<string, number> = {};
+                docs.forEach(s => {
+                    const name = s.result?.disease || s.analysis || s.disease || 'Unknown condition';
+                    freq[name] = (freq[name] || 0) + 1;
+                });
+                setChartData(Object.entries(freq).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+
+        fetchScans();
+        return () => { cancelled = true; };
     }, [user, isGuest]);
 
     const buildSingleParams = (scan: Scan, idx: number) => ({
