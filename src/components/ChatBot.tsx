@@ -69,10 +69,13 @@ function inlineRender(text: string): React.ReactNode {
 
 // ── Full markdown renderer ────────────────────────────────────────────────────
 function renderMarkdown(text: string): React.ReactNode {
-  const blocks  = text.split(/\n{2,}/);
+  const lines = text.split('\n');
   const nodes: React.ReactNode[] = [];
   const refs: { label: string; url: string }[] = [];
   let inSources = false;
+  let paraBuffer: string[] = [];
+  let bulletBuffer: string[] = [];
+  let numBuffer: string[] = [];
 
   const bodyStyle: React.CSSProperties = {
     margin: 0, color: 'var(--tx2)', lineHeight: 1.65, fontSize: '0.83rem',
@@ -83,97 +86,130 @@ function renderMarkdown(text: string): React.ReactNode {
     fontFamily: "'Inter', sans-serif",
   };
 
-  for (let bi = 0; bi < blocks.length; bi++) {
-    const block = blocks[bi].trim();
-    if (!block) continue;
-    const lines = block.split('\n');
+  const flushPara = (key: string) => {
+    if (!paraBuffer.length) return;
+    const t = paraBuffer.join(' ').trim();
+    if (t) nodes.push(<p key={key} style={bodyStyle}>{inlineRender(t)}</p>);
+    paraBuffer = [];
+  };
 
-    // ── Headings ──────────────────────────────────────────────────────────────
-    if (/^#{1,3} /.test(lines[0])) {
-      const content = lines[0].replace(/^#+\s*/, '');
-      if (/source|reference/i.test(content)) { inSources = true; continue; }
+  const flushBullets = (key: string) => {
+    if (!bulletBuffer.length) return;
+    nodes.push(
+      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        {bulletBuffer.map((l, li) => (
+          <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, marginTop: '1px' }}>•</span>
+            <span style={bulletStyle}>{inlineRender(l)}</span>
+          </div>
+        ))}
+      </div>
+    );
+    bulletBuffer = [];
+  };
+
+  const flushNums = (key: string) => {
+    if (!numBuffer.length) return;
+    nodes.push(
+      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        {numBuffer.map((l, li) => (
+          <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, minWidth: '14px', marginTop: '1px' }}>{li + 1}.</span>
+            <span style={bulletStyle}>{inlineRender(l)}</span>
+          </div>
+        ))}
+      </div>
+    );
+    numBuffer = [];
+  };
+
+  lines.forEach((rawLine, idx) => {
+    const line = rawLine.trimEnd();
+    const k = idx;
+
+    // Blank line — flush everything
+    if (!line.trim()) {
+      flushBullets(`b${k}`); flushNums(`n${k}`); flushPara(`p${k}`);
+      return;
+    }
+
+    // Heading — either ### syntax or a short label ending with colon
+    const isHashHeading = /^#{1,6} /.test(line);
+    const isLabelHeading = !isHashHeading && /^[A-Z][^.!?\n]{0,48}:$/.test(line.trim()) && !/^[-*\d]/.test(line.trim());
+    if (isHashHeading || isLabelHeading) {
+      flushBullets(`b${k}`); flushNums(`n${k}`); flushPara(`p${k}`);
+      const content = isHashHeading ? line.replace(/^#+\s*/, '') : line.trim().replace(/:$/, '');
+      if (/source|reference/i.test(content)) { inSources = true; return; }
       inSources = false;
       nodes.push(
-        <p key={`h${bi}`} style={{
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-          fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent)',
-          letterSpacing: '0.01em', lineHeight: 1.4, margin: 0,
-        }}>
-          {inlineRender(content)}
-        </p>
-      );
-      if (lines.length > 1)
-        nodes.push(<p key={`hb${bi}`} style={bodyStyle}>{inlineRender(lines.slice(1).join(' '))}</p>);
-      continue;
-    }
-
-    // ── Sources section items ─────────────────────────────────────────────────
-    if (inSources) {
-      lines.filter(l => /^[-*\d]/.test(l.trim())).forEach(l => {
-        const raw = l.replace(/^[-*\d.]\s*/, '').trim();
-        const mdLink = raw.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/);
-        if (mdLink) {
-          refs.push({ label: mdLink[1], url: mdLink[2] });
-        } else {
-          const lower = raw.toLowerCase();
-          const hit = Object.entries(SOURCE_URLS).find(([k]) => lower.includes(k));
-          refs.push({ label: raw, url: hit ? hit[1] : '' });
-        }
-      });
-      continue;
-    }
-
-    // ── Bullet list ───────────────────────────────────────────────────────────
-    const bulletItems = lines.filter(l => /^[-*]\s/.test(l.trim()));
-    if (bulletItems.length > 0) {
-      nodes.push(
-        <div key={`bl${bi}`} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-          {bulletItems.map((l, li) => (
-            <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, marginTop: '1px' }}>•</span>
-              <span style={bulletStyle}>{inlineRender(l.trim().replace(/^[-*]\s/, ''))}</span>
-            </div>
-          ))}
+        <div key={`h${k}`} style={{ marginTop: '2px' }}>
+          <span style={{
+            display: 'inline-block',
+            padding: '2px 9px',
+            borderRadius: '999px',
+            background: 'var(--accent-dim)',
+            color: 'var(--accent)',
+            fontSize: '0.63rem',
+            fontWeight: 700,
+            letterSpacing: '0.07em',
+            textTransform: 'uppercase',
+            fontFamily: "'Inter', sans-serif",
+            border: '1px solid rgba(0,229,255,0.22)',
+          }}>
+            {inlineRender(content)}
+          </span>
         </div>
       );
-      continue;
+      return;
     }
 
-    // ── Numbered list ─────────────────────────────────────────────────────────
-    const numItems = lines.filter(l => /^\d+\.\s/.test(l.trim()));
-    if (numItems.length > 0) {
-      nodes.push(
-        <div key={`nl${bi}`} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-          {numItems.map((l, li) => (
-            <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, minWidth: '14px', marginTop: '1px' }}>{li + 1}.</span>
-              <span style={bulletStyle}>{inlineRender(l.trim().replace(/^\d+\.\s/, ''))}</span>
-            </div>
-          ))}
-        </div>
-      );
-      continue;
+    // Sources section list items
+    if (inSources && /^[-*\d]/.test(line.trim())) {
+      const raw = line.replace(/^[-*\d.]\s*/, '').trim();
+      const mdLink = raw.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/);
+      if (mdLink) {
+        refs.push({ label: mdLink[1], url: mdLink[2] });
+      } else {
+        const lower = raw.toLowerCase();
+        const hit = Object.entries(SOURCE_URLS).find(([k]) => lower.includes(k));
+        refs.push({ label: raw, url: hit ? hit[1] : '' });
+      }
+      return;
     }
 
-    // ── Horizontal rule ───────────────────────────────────────────────────────
-    if (/^---+$/.test(lines[0])) {
-      nodes.push(<hr key={`hr${bi}`} style={{ border: 'none', borderTop: '1px solid var(--br)', margin: '2px 0' }}/>);
-      continue;
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) {
+      flushBullets(`b${k}`); flushNums(`n${k}`); flushPara(`p${k}`);
+      nodes.push(<hr key={`hr${k}`} style={{ border: 'none', borderTop: '1px solid var(--br)', margin: '2px 0' }}/>);
+      return;
     }
 
-    // ── Paragraph ─────────────────────────────────────────────────────────────
-    nodes.push(
-      <p key={`p${bi}`} style={bodyStyle}>{inlineRender(lines.join(' '))}</p>
-    );
-  }
+    // Bullet item
+    if (/^[-*]\s/.test(line.trim())) {
+      flushNums(`n${k}`); flushPara(`p${k}`);
+      bulletBuffer.push(line.trim().replace(/^[-*]\s/, ''));
+      return;
+    }
+
+    // Numbered item
+    if (/^\d+\.\s/.test(line.trim())) {
+      flushBullets(`b${k}`); flushPara(`p${k}`);
+      numBuffer.push(line.trim().replace(/^\d+\.\s/, ''));
+      return;
+    }
+
+    // Regular paragraph text
+    flushBullets(`b${k}`); flushNums(`n${k}`);
+    paraBuffer.push(line);
+  });
+
+  // Flush anything remaining
+  flushBullets('bend'); flushNums('nend'); flushPara('pend');
 
   // ── References section ────────────────────────────────────────────────────
   if (refs.length > 0) {
     nodes.push(
-      <div key="refs" style={{
-        marginTop: '4px', paddingTop: '8px',
-        borderTop: '1px solid var(--br)',
-      }}>
+      <div key="refs" style={{ marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--br)' }}>
         <p style={{ margin: '0 0 5px', fontSize: '0.68rem', fontWeight: 700, color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Inter', sans-serif" }}>
           References
         </p>
