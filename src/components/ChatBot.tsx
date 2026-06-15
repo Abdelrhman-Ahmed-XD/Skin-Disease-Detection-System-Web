@@ -314,13 +314,14 @@ export const ChatBot: React.FC = () => {
     const W = typeof window !== 'undefined' ? window.innerWidth : 1440;
     const H = typeof window !== 'undefined' ? window.innerHeight : 900;
     const panelW = Math.max(300, Math.min(400, W * 0.92));
-    const panelH = Math.max(440, Math.min(580, H * 0.72));
     const btnSize = btnPx;
     const gap = 12;
 
-    // Prefer opening above the button; fall back to below if not enough space
-    let top = pos.y - gap - panelH;
-    if (top < 8) top = Math.min(H - panelH - 8, pos.y + btnSize + gap);
+    // Available space above the button (always open above, never below)
+    const availableH = pos.y - gap - 8;
+    const panelH = Math.max(300, Math.min(580, Math.min(H * 0.72, availableH)));
+
+    const top = Math.max(8, pos.y - gap - panelH);
 
     // Right-align panel with button right edge, clamp to viewport
     let left = pos.x + btnSize - panelW;
@@ -328,10 +329,10 @@ export const ChatBot: React.FC = () => {
 
     return {
       position: 'fixed',
-      top: Math.max(8, top),
+      top,
       left,
       width: panelW,
-      height: 'clamp(440px, 72vh, 580px)',
+      height: panelH,
       zIndex: 9998,
       background: 'var(--surface)',
       border: '1px solid var(--br)',
