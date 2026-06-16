@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { doc, updateDoc, collection, query, getCountFromServer } from 'firebase/firestore';
 import {
   updateProfile, EmailAuthProvider, reauthenticateWithCredential,
-  updatePassword, sendEmailVerification, updateEmail,
+  updatePassword,
 } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useNavigate } from 'react-router-dom';
@@ -165,6 +165,15 @@ export const Profile: React.FC = () => {
   const [emailIsResending, setEmailIsResending] = useState(false);
   const emailInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
+  // verify current email OTP
+  const [verifyStep, setVerifyStep] = useState<'idle' | 'otp'>('idle');
+  const [verifyOtp, setVerifyOtp] = useState(['','','','','','']);
+  const [verifyServerOtp, setVerifyServerOtp] = useState('');
+  const [verifyTimer, setVerifyTimer] = useState(60);
+  const [verifyCanResend, setVerifyCanResend] = useState(false);
+  const [verifyIsResending, setVerifyIsResending] = useState(false);
+  const verifyInputsRef = useRef<(HTMLInputElement | null)[]>([]);
+
   useEffect(() => {
     if (!userProfile) return;
     setFirstName(userProfile.firstName || '');
@@ -195,6 +204,13 @@ export const Profile: React.FC = () => {
     const interval = setInterval(() => setEmailTimer((prev) => prev - 1), 1000);
     return () => clearInterval(interval);
   }, [emailTimer, stepEmail]);
+
+  useEffect(() => {
+    if (verifyStep !== 'otp') return;
+    if (verifyTimer === 0) { setVerifyCanResend(true); return; }
+    const interval = setInterval(() => setVerifyTimer(prev => prev - 1), 1000);
+    return () => clearInterval(interval);
+  }, [verifyTimer, verifyStep]);
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -349,11 +365,18 @@ export const Profile: React.FC = () => {
 
     setSavingEmail(true);
     try {
-      // Re-authenticate to ensure a fresh session, then update email directly.
-      // OTP already verified ownership of the new address, so no secondary link is needed.
-      const cred = EmailAuthProvider.credential(user!.email!, emailPw);
-      await reauthenticateWithCredential(auth.currentUser!, cred);
-      await updateEmail(auth.currentUser!, newEmail.trim());
+      const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
+      // Use Admin SDK via backend — bypasses Firebase client requirement that current email be verified
+      const updateRes = await fetch(`${flaskUrl}/api/update-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user!.uid, new_email: newEmail.trim() })
+      });
+      if (!updateRes.ok) {
+        const data = await updateRes.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update email');
+      }
+      await auth.currentUser!.reload();
       await updateDoc(doc(db, 'users', user!.uid), { email: newEmail.trim(), updatedAt: new Date().toISOString() });
       setEmailSent(true);
       setStepEmail('form');
@@ -380,11 +403,74 @@ export const Profile: React.FC = () => {
   };
 
   const sendVerification = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !user?.email) return;
     setSendingVerif(true);
-    try { await sendEmailVerification(auth.currentUser); toast.success('Verification email sent! Check your inbox.'); }
-    catch (e: any) { toast.error('Too many requests — wait before trying again'); }
+    try {
+      const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
+      const genOtp = generateOTP();
+      setVerifyServerOtp(genOtp);
+      const res = await fetch(`${flaskUrl}/api/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, name: userProfile?.firstName || 'User', otp_code: genOtp, source: 'web' })
+      });
+      if (!res.ok) throw new Error('Failed to send code');
+      setVerifyOtp(['','','','','','']);
+      setVerifyTimer(60);
+      setVerifyCanResend(false);
+      setVerifyStep('otp');
+      toast.success('Verification code sent to your email!');
+    } catch { toast.error('Failed to send verification code'); }
     finally { setSendingVerif(false); }
+  };
+
+  const verifyCurrentEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (verifyOtp.join('') !== verifyServerOtp) { toast.error('Invalid verification code'); return; }
+    setSendingVerif(true);
+    try {
+      await updateDoc(doc(db, 'users', user!.uid), { isEmailVerified: true, updatedAt: new Date().toISOString() });
+      await refreshProfile();
+      setVerifyStep('idle');
+      toast.success('Email verified successfully!');
+    } catch { toast.error('Failed to verify email'); }
+    finally { setSendingVerif(false); }
+  };
+
+  const handleResendVerifyOtp = async () => {
+    setVerifyIsResending(true);
+    try {
+      const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
+      const genOtp = generateOTP();
+      setVerifyServerOtp(genOtp);
+      const res = await fetch(`${flaskUrl}/api/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user!.email, name: userProfile?.firstName || 'User', otp_code: genOtp, source: 'web' })
+      });
+      if (!res.ok) throw new Error();
+      setVerifyTimer(60);
+      setVerifyCanResend(false);
+      setVerifyOtp(['','','','','','']);
+      verifyInputsRef.current[0]?.focus();
+      toast.success('A new code has been sent!');
+    } catch { toast.error('Failed to resend the verification code.'); }
+    finally { setVerifyIsResending(false); }
+  };
+
+  const handleVerifyOtpChange = (idx: number, val: string) => {
+    if (!/^\d*$/.test(val)) return;
+    const next = [...verifyOtp]; next[idx] = val.slice(-1); setVerifyOtp(next);
+    if (val && idx < 5) verifyInputsRef.current[idx + 1]?.focus();
+  };
+  const handleVerifyOtpKeyDown = (idx: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !verifyOtp[idx] && idx > 0) verifyInputsRef.current[idx - 1]?.focus();
+  };
+  const handleVerifyPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6);
+    const next = [...verifyOtp]; text.split('').forEach((c,i) => { next[i] = c; }); setVerifyOtp(next);
+    verifyInputsRef.current[Math.min(text.length, 5)]?.focus();
   };
 
   const handleLogout = async () => { await logout(); navigate('/'); };
@@ -441,34 +527,83 @@ export const Profile: React.FC = () => {
           </div>
 
           <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--surface)' }}>
-            {TABS.map(t => ( <button key={t.id} onClick={() => { setTab(t.id); setPwDone(false); setEmailSent(false); setStepEmail('form'); }} className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all" style={{ background: tab === t.id ? 'var(--accent)' : 'transparent', color: tab === t.id ? '#070d1a' : 'var(--tx2)' }}>{t.label}</button> ))}
+            {TABS.map(t => ( <button key={t.id} onClick={() => { setTab(t.id); setPwDone(false); setEmailSent(false); setStepEmail('form'); setVerifyStep('idle'); }} className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all" style={{ background: tab === t.id ? 'var(--accent)' : 'transparent', color: tab === t.id ? '#070d1a' : 'var(--tx2)' }}>{t.label}</button> ))}
           </div>
 
           <AnimatePresence mode="wait">
             {tab === 'profile' && (
-                <motion.div key="profile" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
-                  <div className="rounded-2xl p-4 sm:p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
-                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Account stats</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[ { icon: Scan, label: 'Total scans', value: countLoading ? '…' : scanCount }, { icon: Calendar, label: 'Member since', value: joinDate }, { icon: Mail, label: 'Email', value: user?.email || '—' }, { icon: ShieldCheck, label: 'Account status', value: isVerified ? 'Verified ✓' : 'Not verified' } ].map(({ icon: Icon, label, value }) => ( <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><Icon size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>{label}</span></div><p className="text-sm font-semibold truncate" style={{ color: 'var(--tx)' }}>{String(value)}</p></div> ))}
-                    </div>
-                  </div>
-                  {(userProfile?.gender || userProfile?.birthYear || userProfile?.skinColor) && (
-                      <div className="rounded-2xl p-4 sm:p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
-                        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Physical profile</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          {userProfile.gender && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><UserIcon size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Gender</span></div><p className="text-sm font-semibold capitalize" style={{ color: 'var(--tx)' }}>{userProfile.gender}</p></div> )}
-                          {userProfile.birthYear && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><Calendar size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Date of birth</span></div><p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>{userProfile.birthDay}/{userProfile.birthMonth}/{userProfile.birthYear}</p></div> )}
-                          {userProfile.skinColor && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: userProfile.skinColor }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Skin tone</span></div><p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>{skinLabel || '—'}</p></div> )}
-                        </div>
-                      </div>
-                  )}
-                  <div className="rounded-2xl p-4 sm:p-5 space-y-2" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
-                    <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--accent)' }}>Actions</p>
-                    <button onClick={() => setTab('edit')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Edit profile information <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button>
-                    {isEmailProvider && ( <> <button onClick={() => setTab('password')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Change password <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button> <button onClick={() => setTab('email')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Change email address <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button> {!isVerified && ( <button onClick={sendVerification} disabled={sendingVerif} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'rgba(245,158,11,0.07)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}><span className="flex items-center gap-2">{sendingVerif ? <Loader2 size={14} className="animate-spin"/> : <Mail size={14}/>} Verify email address</span><ChevronRight size={15}/></button> )} </> )}
-                    <button onClick={handleLogout} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all" style={{ background: 'rgba(239,68,68,0.07)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.14)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.07)'; }}><span className="flex items-center gap-2"><LogOut size={14}/> Sign out</span></button>
-                  </div>
+                <motion.div key="profile" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <AnimatePresence mode="wait">
+                    {verifyStep === 'otp' ? (
+                        <motion.div key="verify-otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="rounded-2xl p-4 sm:p-6 space-y-5" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                          <div className="text-center mb-8">
+                            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}><Mail size={30}/></div>
+                            <h1 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Verify your email</h1>
+                            <p className="text-sm mt-2" style={{ color: 'var(--tx2)' }}>We sent a 6-digit code to<br/><strong style={{ color: 'var(--tx)' }}>{user?.email}</strong></p>
+                          </div>
+                          <form onSubmit={verifyCurrentEmailOtp} className="space-y-6">
+                            <div className="flex items-center justify-center gap-1 sm:gap-3" onPaste={handleVerifyPaste}>
+                              {verifyOtp.map((digit, i) => (
+                                  <input key={i} ref={el => { verifyInputsRef.current[i] = el; }}
+                                         type="text" inputMode="numeric" maxLength={1} value={digit}
+                                         onChange={e => handleVerifyOtpChange(i, e.target.value)}
+                                         onKeyDown={e => handleVerifyOtpKeyDown(i, e)}
+                                         className={`w-10 sm:w-14 h-14 sm:h-16 text-center text-xl sm:text-2xl font-bold rounded-xl outline-none transition-all duration-200 border-2 ${digit ? 'border-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' : 'border-[var(--br)] hover:border-[var(--accent)] focus:border-[var(--accent)] hover:shadow-[0_0_10px_var(--accent-glow)] focus:shadow-[0_0_10px_var(--accent-glow)]'}`}
+                                         style={{ background: 'var(--surface2)', color: 'var(--tx)' }}
+                                  />
+                              ))}
+                            </div>
+                            <div className="flex flex-col items-center justify-center mt-6">
+                              {verifyCanResend ? (
+                                  <button type="button" onClick={handleResendVerifyOtp} disabled={verifyIsResending}
+                                          className="flex items-center gap-2 text-sm font-bold hover:underline transition-all"
+                                          style={{ color: verifyIsResending ? 'var(--tx3)' : 'var(--accent)' }}>
+                                    <RefreshCw size={14} className={verifyIsResending ? 'animate-spin' : ''}/>
+                                    {verifyIsResending ? 'Sending new code...' : 'Resend Code'}
+                                  </button>
+                              ) : (
+                                  <p className="text-sm font-medium" style={{ color: 'var(--tx2)' }}>
+                                    Resend code in <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>00:{verifyTimer.toString().padStart(2, '0')}</span>
+                                  </p>
+                              )}
+                            </div>
+                            <button type="submit" disabled={verifyOtp.join('').length < 6 || sendingVerif}
+                                    className="btn-accent w-full py-3.5 rounded-xl text-base font-bold flex items-center justify-center gap-2 mt-4 disabled:opacity-50 transition-all duration-300">
+                              {sendingVerif ? <span className="spin w-5 h-5 border-2 border-current/30 border-t-current rounded-full"/> : null}
+                              {sendingVerif ? 'Verifying...' : 'Verify Email'}
+                            </button>
+                            <div className="pt-2 text-center border-t" style={{ borderColor: 'var(--br2)' }}>
+                              <button type="button" onClick={() => setVerifyStep('idle')} className="text-xs font-semibold hover:underline" style={{ color: 'var(--tx3)' }}>Cancel</button>
+                            </div>
+                          </form>
+                        </motion.div>
+                    ) : (
+                        <motion.div key="profile-content" className="space-y-4">
+                          <div className="rounded-2xl p-4 sm:p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Account stats</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              {[ { icon: Scan, label: 'Total scans', value: countLoading ? '…' : scanCount }, { icon: Calendar, label: 'Member since', value: joinDate }, { icon: Mail, label: 'Email', value: user?.email || '—' }, { icon: ShieldCheck, label: 'Account status', value: isVerified ? 'Verified ✓' : 'Not verified' } ].map(({ icon: Icon, label, value }) => ( <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><Icon size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>{label}</span></div><p className="text-sm font-semibold truncate" style={{ color: 'var(--tx)' }}>{String(value)}</p></div> ))}
+                            </div>
+                          </div>
+                          {(userProfile?.gender || userProfile?.birthYear || userProfile?.skinColor) && (
+                              <div className="rounded-2xl p-4 sm:p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Physical profile</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {userProfile.gender && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><UserIcon size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Gender</span></div><p className="text-sm font-semibold capitalize" style={{ color: 'var(--tx)' }}>{userProfile.gender}</p></div> )}
+                                  {userProfile.birthYear && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><Calendar size={13} style={{ color: 'var(--accent)' }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Date of birth</span></div><p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>{userProfile.birthDay}/{userProfile.birthMonth}/{userProfile.birthYear}</p></div> )}
+                                  {userProfile.skinColor && ( <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}><div className="flex items-center gap-2 mb-1"><span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: userProfile.skinColor }}/><span className="text-xs font-medium" style={{ color: 'var(--tx3)' }}>Skin tone</span></div><p className="text-sm font-semibold" style={{ color: 'var(--tx)' }}>{skinLabel || '—'}</p></div> )}
+                                </div>
+                              </div>
+                          )}
+                          <div className="rounded-2xl p-4 sm:p-5 space-y-2" style={{ background: 'var(--surface)', border: '1px solid var(--br)' }}>
+                            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--accent)' }}>Actions</p>
+                            <button onClick={() => setTab('edit')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Edit profile information <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button>
+                            {isEmailProvider && ( <> <button onClick={() => setTab('password')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Change password <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button> <button onClick={() => setTab('email')} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'var(--surface2)', color: 'var(--tx)' }}>Change email address <ChevronRight size={15} style={{ color: 'var(--tx3)' }}/></button> {!isVerified && ( <button onClick={sendVerification} disabled={sendingVerif} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all card-hover" style={{ background: 'rgba(245,158,11,0.07)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}><span className="flex items-center gap-2">{sendingVerif ? <Loader2 size={14} className="animate-spin"/> : <Mail size={14}/>} Verify email address</span><ChevronRight size={15}/></button> )} </> )}
+                            <button onClick={handleLogout} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all" style={{ background: 'rgba(239,68,68,0.07)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.14)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.07)'; }}><span className="flex items-center gap-2"><LogOut size={14}/> Sign out</span></button>
+                          </div>
+                        </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
             )}
 
