@@ -167,6 +167,7 @@ export const Profile: React.FC = () => {
 
   // verify current email OTP
   const [verifyStep, setVerifyStep] = useState<'idle' | 'otp'>('idle');
+  const [verifyTargetEmail, setVerifyTargetEmail] = useState('');
   const [verifyOtp, setVerifyOtp] = useState(['','','','','','']);
   const [verifyServerOtp, setVerifyServerOtp] = useState('');
   const [verifyTimer, setVerifyTimer] = useState(60);
@@ -375,12 +376,24 @@ export const Profile: React.FC = () => {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to update email');
       }
-      await auth.currentUser!.reload();
-      await updateDoc(doc(db, 'users', user!.uid), { email: newEmail.trim(), updatedAt: new Date().toISOString() });
-      setEmailSent(true);
+
+      // OTP already proved ownership of the new email — mark as verified immediately
+      await updateDoc(doc(db, 'users', user!.uid), {
+        email: newEmail.trim(),
+        isEmailVerified: true,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Reset email-change form and go back to profile overview
       setStepEmail('form');
-      setNewEmail(''); setEmailPw('');
-      toast.success('Email successfully updated!');
+      setEmailOtp(['','','','','','']);
+      setNewEmail('');
+      setEmailPw('');
+      setTab('profile');
+
+      try { await refreshProfile(); } catch { /* silent */ }
+
+      toast.success('Email updated and verified successfully!');
     } catch (e: any) {
       toast.error(e.message || 'Failed to finalize email update');
     } finally { setSavingEmail(false); }
@@ -414,6 +427,7 @@ export const Profile: React.FC = () => {
         body: JSON.stringify({ email: user.email, name: userProfile?.firstName || 'User', otp_code: genOtp, source: 'web' })
       });
       if (!res.ok) throw new Error('Failed to send code');
+      setVerifyTargetEmail(user.email);
       setVerifyOtp(['','','','','','']);
       setVerifyTimer(60);
       setVerifyCanResend(false);
@@ -445,7 +459,7 @@ export const Profile: React.FC = () => {
       const res = await fetch(`${flaskUrl}/api/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user!.email, name: userProfile?.firstName || 'User', otp_code: genOtp, source: 'web' })
+        body: JSON.stringify({ email: verifyTargetEmail, name: userProfile?.firstName || 'User', otp_code: genOtp, source: 'web' })
       });
       if (!res.ok) throw new Error();
       setVerifyTimer(60);
@@ -538,7 +552,7 @@ export const Profile: React.FC = () => {
                           <div className="text-center mb-8">
                             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}><Mail size={30}/></div>
                             <h1 className="text-2xl font-extrabold" style={{ color: 'var(--tx)' }}>Verify your email</h1>
-                            <p className="text-sm mt-2" style={{ color: 'var(--tx2)' }}>We sent a 6-digit code to<br/><strong style={{ color: 'var(--tx)' }}>{user?.email}</strong></p>
+                            <p className="text-sm mt-2" style={{ color: 'var(--tx2)' }}>We sent a 6-digit code to<br/><strong style={{ color: 'var(--tx)' }}>{verifyTargetEmail}</strong></p>
                           </div>
                           <form onSubmit={verifyCurrentEmailOtp} className="space-y-6">
                             <div className="flex items-center justify-center gap-1 sm:gap-3" onPaste={handleVerifyPaste}>
