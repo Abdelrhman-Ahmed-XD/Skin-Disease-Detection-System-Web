@@ -366,14 +366,13 @@ export const Profile: React.FC = () => {
     setSavingEmail(true);
     try {
       const flaskUrl = import.meta.env.VITE_FLASK_URL || 'http://127.0.0.1:5000';
-      // Use Admin SDK via backend — bypasses Firebase client requirement that current email be verified
-      const updateRes = await fetch(`${flaskUrl}/api/update-email`, {
+      const res = await fetch(`${flaskUrl}/api/update-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: user!.uid, new_email: newEmail.trim() })
+        body: JSON.stringify({ uid: user!.uid, new_email: newEmail.trim() }),
       });
-      if (!updateRes.ok) {
-        const data = await updateRes.json().catch(() => ({}));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to update email');
       }
       await auth.currentUser!.reload();
