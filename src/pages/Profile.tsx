@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { doc, updateDoc, collection, query, getCountFromServer } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getCountFromServer } from 'firebase/firestore';
 import {
   updateProfile, EmailAuthProvider, reauthenticateWithCredential,
   updatePassword,
@@ -192,8 +192,12 @@ export const Profile: React.FC = () => {
     if (!user) { setCountLoading(false); return; }
     (async () => {
       try {
-        const snap = await getCountFromServer(query(collection(db, 'users', user.uid, 'scans')));
-        setScanCount(snap.data().count);
+        const scansRef = collection(db, 'users', user.uid, 'scans');
+        const [totalSnap, deletedSnap] = await Promise.all([
+          getCountFromServer(scansRef),
+          getCountFromServer(query(scansRef, where('isDeleted', '==', true))),
+        ]);
+        setScanCount(totalSnap.data().count - deletedSnap.data().count);
       } catch { } finally { setCountLoading(false); }
     })();
   }, [user]);
