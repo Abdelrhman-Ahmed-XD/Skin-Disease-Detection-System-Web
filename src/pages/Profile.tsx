@@ -283,7 +283,13 @@ export const Profile: React.FC = () => {
       setCurPw(''); setNewPw(''); setConfirmPw('');
       toast.success('Password changed!');
     } catch (e: any) {
-      toast.error('Failed to change password or current password incorrect');
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+        toast.error('Incorrect current password. Please try again.');
+      } else if (e.code === 'auth/too-many-requests') {
+        toast.error('Too many failed attempts. Please wait a few minutes and try again.');
+      } else {
+        toast.error('Failed to change password. Please try again.');
+      }
     }
     finally { setSavingPw(false); }
   };
@@ -328,7 +334,13 @@ export const Profile: React.FC = () => {
       setEmailCanResend(false);
       toast.success(`Verification code sent to ${newEmail}`);
     } catch (e: any) {
-      toast.error(e.message || 'Failed to process email change');
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+        toast.error('Incorrect password. Please try again.');
+      } else if (e.code === 'auth/too-many-requests') {
+        toast.error('Too many failed attempts. Please wait a few minutes and try again.');
+      } else {
+        toast.error(e.message || 'Failed to process email change');
+      }
     } finally { setSavingEmail(false); }
   };
 
