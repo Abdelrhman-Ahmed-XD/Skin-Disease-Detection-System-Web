@@ -54,10 +54,10 @@ function inlineRender(text: string): React.ReactNode {
     const link = p.match(/^\[([^\]]+)\]\((https?:\/\/[^\)]+)\)$/);
     if (link)
       return (
-        <a key={i} href={link[2]} target="_blank" rel="noreferrer"
-           style={{ color: 'var(--accent)', textDecoration: 'underline dotted', cursor: 'pointer' }}>
-          {link[1]}
-        </a>
+          <a key={i} href={link[2]} target="_blank" rel="noreferrer"
+             style={{ color: 'var(--accent)', textDecoration: 'underline dotted', cursor: 'pointer' }}>
+            {link[1]}
+          </a>
       );
     if (p.startsWith('**') && p.endsWith('**') && p.length > 4)
       return <strong key={i} style={{ color: 'var(--tx)', fontWeight: 700 }}>{p.slice(2, -2)}</strong>;
@@ -76,6 +76,7 @@ function renderMarkdown(text: string): React.ReactNode {
   let paraBuffer: string[] = [];
   let bulletBuffer: string[] = [];
   let numBuffer: string[] = [];
+  let tableBuffer: string[] = [];
 
   const bodyStyle: React.CSSProperties = {
     margin: 0, color: 'var(--tx2)', lineHeight: 1.65, fontSize: '0.83rem',
@@ -96,14 +97,14 @@ function renderMarkdown(text: string): React.ReactNode {
   const flushBullets = (key: string) => {
     if (!bulletBuffer.length) return;
     nodes.push(
-      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        {bulletBuffer.map((l, li) => (
-          <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-            <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, marginTop: '1px' }}>•</span>
-            <span style={bulletStyle}>{inlineRender(l)}</span>
-          </div>
-        ))}
-      </div>
+        <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {bulletBuffer.map((l, li) => (
+              <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, marginTop: '1px' }}>•</span>
+                <span style={bulletStyle}>{inlineRender(l)}</span>
+              </div>
+          ))}
+        </div>
     );
     bulletBuffer = [];
   };
@@ -111,16 +112,65 @@ function renderMarkdown(text: string): React.ReactNode {
   const flushNums = (key: string) => {
     if (!numBuffer.length) return;
     nodes.push(
-      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        {numBuffer.map((l, li) => (
-          <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-            <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, minWidth: '14px', marginTop: '1px' }}>{li + 1}.</span>
-            <span style={bulletStyle}>{inlineRender(l)}</span>
-          </div>
-        ))}
-      </div>
+        <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {numBuffer.map((l, li) => (
+              <div key={li} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '0.7rem', lineHeight: '1.65', flexShrink: 0, minWidth: '14px', marginTop: '1px' }}>{li + 1}.</span>
+                <span style={bulletStyle}>{inlineRender(l)}</span>
+              </div>
+          ))}
+        </div>
     );
     numBuffer = [];
+  };
+
+  // ── Table row helpers ────────────────────────────────────────────────────
+  const isTableRow = (l: string) => /^\|.+\|$/.test(l.trim());
+  const isTableSeparator = (l: string) =>
+      /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(l.trim());
+  const parseTableRow = (l: string): string[] =>
+      l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+
+  const flushTable = (key: string) => {
+    if (!tableBuffer.length) return;
+    const rows = tableBuffer.map(parseTableRow);
+    let header: string[] | null = null;
+    let bodyRows = rows;
+    if (rows.length > 1 && isTableSeparator(tableBuffer[1])) {
+      header = rows[0];
+      bodyRows = rows.slice(2);
+    }
+    nodes.push(
+        <div key={key} style={{ overflowX: 'auto', margin: '2px 0', borderRadius: '8px', border: '1px solid var(--br)' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem', fontFamily: "'Inter', sans-serif" }}>
+            {header && (
+                <thead>
+                <tr>
+                  {header.map((h, i) => (
+                      <th key={i} style={{
+                        textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--br)',
+                        color: 'var(--tx)', fontWeight: 700, background: 'var(--surface2)', whiteSpace: 'nowrap',
+                      }}>{inlineRender(h)}</th>
+                  ))}
+                </tr>
+                </thead>
+            )}
+            <tbody>
+            {bodyRows.map((row, ri) => (
+                <tr key={ri} style={{ background: ri % 2 ? 'transparent' : 'var(--surface)' }}>
+                  {row.map((cell, ci) => (
+                      <td key={ci} style={{
+                        padding: '6px 10px', borderBottom: '1px solid var(--br)',
+                        color: 'var(--tx2)', verticalAlign: 'top', lineHeight: 1.5,
+                      }}>{inlineRender(cell)}</td>
+                  ))}
+                </tr>
+            ))}
+            </tbody>
+          </table>
+        </div>
+    );
+    tableBuffer = [];
   };
 
   lines.forEach((rawLine, idx) => {
@@ -129,9 +179,18 @@ function renderMarkdown(text: string): React.ReactNode {
 
     // Blank line — flush everything
     if (!line.trim()) {
-      flushBullets(`b${k}`); flushNums(`n${k}`); flushPara(`p${k}`);
+      flushBullets(`b${k}`); flushNums(`n${k}`); flushPara(`p${k}`); flushTable(`t${k}`);
       return;
     }
+
+    // Table row
+    if (isTableRow(line)) {
+      flushBullets(`b${k}`); flushNums(`n${k}`); flushPara(`p${k}`);
+      tableBuffer.push(line.trim());
+      return;
+    }
+    // Non-table line after a buffered table — flush it before continuing
+    if (tableBuffer.length) flushTable(`t${k}`);
 
     // Heading — either ### syntax or a short label ending with colon
     const isHashHeading = /^#{1,6} /.test(line);
@@ -142,7 +201,7 @@ function renderMarkdown(text: string): React.ReactNode {
       if (/source|reference/i.test(content)) { inSources = true; return; }
       inSources = false;
       nodes.push(
-        <div key={`h${k}`} style={{ marginTop: '2px' }}>
+          <div key={`h${k}`} style={{ marginTop: '2px' }}>
           <span style={{
             display: 'inline-block',
             padding: '2px 9px',
@@ -158,7 +217,7 @@ function renderMarkdown(text: string): React.ReactNode {
           }}>
             {inlineRender(content)}
           </span>
-        </div>
+          </div>
       );
       return;
     }
@@ -204,44 +263,44 @@ function renderMarkdown(text: string): React.ReactNode {
   });
 
   // Flush anything remaining
-  flushBullets('bend'); flushNums('nend'); flushPara('pend');
+  flushBullets('bend'); flushNums('nend'); flushPara('pend'); flushTable('tend');
 
   // ── References section ────────────────────────────────────────────────────
   if (refs.length > 0) {
     nodes.push(
-      <div key="refs" style={{ marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--br)' }}>
-        <p style={{ margin: '0 0 5px', fontSize: '0.68rem', fontWeight: 700, color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Inter', sans-serif" }}>
-          References
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {refs.map((r, i) =>
-            r.url
-              ? <a key={i} href={r.url} target="_blank" rel="noreferrer"
-                   style={{ fontSize: '0.77rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', textDecoration: 'none', fontFamily: "'Inter', sans-serif" }}
-                   onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-                   onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
-                  <ExternalLink size={10} style={{ flexShrink: 0 }}/>{r.label}
-                </a>
-              : <span key={i} style={{ fontSize: '0.77rem', color: 'var(--tx3)', fontFamily: "'Inter', sans-serif" }}>{r.label}</span>
-          )}
+        <div key="refs" style={{ marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--br)' }}>
+          <p style={{ margin: '0 0 5px', fontSize: '0.68rem', fontWeight: 700, color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Inter', sans-serif" }}>
+            References
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {refs.map((r, i) =>
+                r.url
+                    ? <a key={i} href={r.url} target="_blank" rel="noreferrer"
+                         style={{ fontSize: '0.77rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', textDecoration: 'none', fontFamily: "'Inter', sans-serif" }}
+                         onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                         onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
+                      <ExternalLink size={10} style={{ flexShrink: 0 }}/>{r.label}
+                    </a>
+                    : <span key={i} style={{ fontSize: '0.77rem', color: 'var(--tx3)', fontFamily: "'Inter', sans-serif" }}>{r.label}</span>
+            )}
+          </div>
         </div>
-      </div>
     );
   }
 
   // ── Disclaimer ────────────────────────────────────────────────────────────
   if (hasSkinContent(text)) {
     nodes.push(
-      <div key="disc" style={{
-        marginTop: '6px', padding: '7px 10px', borderRadius: '8px',
-        background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
-        display: 'flex', gap: '7px', alignItems: 'flex-start',
-      }}>
-        <span style={{ fontSize: '0.72rem', color: '#f87171', flexShrink: 0, marginTop: '1px' }}>⚠</span>
-        <p style={{ margin: 0, fontSize: '0.72rem', color: '#f87171', lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>
-          For informational purposes only. Always consult a qualified dermatologist for medical advice regarding any skin condition.
-        </p>
-      </div>
+        <div key="disc" style={{
+          marginTop: '6px', padding: '7px 10px', borderRadius: '8px',
+          background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
+          display: 'flex', gap: '7px', alignItems: 'flex-start',
+        }}>
+          <span style={{ fontSize: '0.72rem', color: '#f87171', flexShrink: 0, marginTop: '1px' }}>⚠</span>
+          <p style={{ margin: 0, fontSize: '0.72rem', color: '#f87171', lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>
+            For informational purposes only. Always consult a qualified dermatologist for medical advice regarding any skin condition.
+          </p>
+        </div>
     );
   }
 
@@ -250,49 +309,49 @@ function renderMarkdown(text: string): React.ReactNode {
 
 // ── Welcome card ──────────────────────────────────────────────────────────────
 const WelcomeCard: React.FC = () => (
-  <div className="flex gap-2">
-    <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden flex items-center justify-center mt-0.5"
-         style={{ background: '#cce9f3' }}>
-      <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
-    </div>
-    <div className="max-w-[84%] px-3 py-2.5"
-         style={{ background: 'var(--surface2)', borderRadius: '4px 18px 18px 18px', color: 'var(--tx)' }}>
-      <p className="font-bold mb-2" style={{ lineHeight: 1.2, fontSize: '0.95rem', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-        <span style={{ color: 'var(--accent)', fontWeight: 900, fontSize: '1.35em', letterSpacing: '-0.02em' }}>S</span>
-        <span>kinSight</span>
-        <span style={{ color: 'var(--tx3)', fontWeight: 400, fontSize: '0.82em', marginLeft: '5px' }}>Assistant</span>
-      </p>
-      <p style={{ color: 'var(--tx3)', fontSize: '0.78rem', marginBottom: '8px', fontFamily: "'Inter', sans-serif" }}>
-        Your AI guide to skin health and this app.
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {[
-          { label: 'App guidance', detail: 'uploading, reading results, navigating' },
-          { label: 'Disease info',  detail: 'NV, MEL, BKL and BCC explained' },
-          { label: 'Skin health',   detail: 'general dermatology questions' },
-        ].map(({ label, detail }) => (
-          <div key={label} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
-            <span style={{ color: 'var(--accent)', fontWeight: 800, lineHeight: '1.55', flexShrink: 0, fontSize: '0.75rem' }}>•</span>
-            <span style={{ fontSize: '0.78rem', color: 'var(--tx2)', lineHeight: '1.55', fontFamily: "'Inter', sans-serif" }}>
-              <strong style={{ color: 'var(--tx)', fontWeight: 600 }}>{label}</strong>{' '}
-              <span style={{ color: 'var(--tx3)' }}>{detail}</span>
-            </span>
-          </div>
-        ))}
+    <div className="flex gap-2">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden flex items-center justify-center mt-0.5"
+           style={{ background: '#cce9f3' }}>
+        <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
       </div>
-      <p style={{ fontSize: '0.75rem', color: 'var(--tx3)', marginTop: '8px', fontFamily: "'Inter', sans-serif" }}>
-        How can I help you today?
-      </p>
+      <div className="max-w-[84%] px-3 py-2.5"
+           style={{ background: 'var(--surface2)', borderRadius: '4px 18px 18px 18px', color: 'var(--tx)' }}>
+        <p className="font-bold mb-2" style={{ lineHeight: 1.2, fontSize: '0.95rem', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <span style={{ color: 'var(--accent)', fontWeight: 900, fontSize: '1.35em', letterSpacing: '-0.02em' }}>S</span>
+          <span>kinSight</span>
+          <span style={{ color: 'var(--tx3)', fontWeight: 400, fontSize: '0.82em', marginLeft: '5px' }}>Assistant</span>
+        </p>
+        <p style={{ color: 'var(--tx3)', fontSize: '0.78rem', marginBottom: '8px', fontFamily: "'Inter', sans-serif" }}>
+          Your AI guide to skin health and this app.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {[
+            { label: 'App guidance', detail: 'uploading, reading results, navigating' },
+            { label: 'Disease info',  detail: 'NV, MEL, BKL and BCC explained' },
+            { label: 'Skin health',   detail: 'general dermatology questions' },
+          ].map(({ label, detail }) => (
+              <div key={label} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
+                <span style={{ color: 'var(--accent)', fontWeight: 800, lineHeight: '1.55', flexShrink: 0, fontSize: '0.75rem' }}>•</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--tx2)', lineHeight: '1.55', fontFamily: "'Inter', sans-serif" }}>
+              <strong style={{ color: 'var(--tx)', fontWeight: 600 }}>{label}</strong>{' '}
+                  <span style={{ color: 'var(--tx3)' }}>{detail}</span>
+            </span>
+              </div>
+          ))}
+        </div>
+        <p style={{ fontSize: '0.75rem', color: 'var(--tx3)', marginTop: '8px', fontFamily: "'Inter', sans-serif" }}>
+          How can I help you today?
+        </p>
+      </div>
     </div>
-  </div>
 );
 
 // ── Logo avatar ───────────────────────────────────────────────────────────────
 const LogoAvatar: React.FC = () => (
-  <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden flex items-center justify-center"
-       style={{ background: '#cce9f3' }}>
-    <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
-  </div>
+    <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden flex items-center justify-center"
+         style={{ background: '#cce9f3' }}>
+      <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
+    </div>
 );
 
 // ── ChatBot ───────────────────────────────────────────────────────────────────
@@ -394,8 +453,8 @@ export const ChatBot: React.FC = () => {
 
     try {
       const history = [...messages, { role: 'user' as const, content: trimmed }]
-        .filter(m => m.content !== WELCOME_MARKER)
-        .slice(-10);
+          .filter(m => m.content !== WELCOME_MARKER)
+          .slice(-10);
 
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
@@ -441,199 +500,199 @@ export const ChatBot: React.FC = () => {
   const showCounter = input.length >= WARN_AT;
 
   return (
-    <>
-      {/* ── Floating button (draggable) */}
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={handleBtnClick}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => { dragRef.current.active = false; }}
-        className="rounded-full flex items-center justify-center shadow-2xl"
-        style={{
-          position: 'fixed',
-          left: pos.x,
-          top: pos.y,
-          width: btnPx,
-          height: btnPx,
-          background: 'var(--accent)', color: '#070d1a',
-          zIndex: 9999, border: 'none',
-          cursor: window.innerWidth < 768 ? 'grab' : 'pointer',
-          touchAction: 'none',
-          userSelect: 'none',
-        }}
-        aria-label="Open SkinSight Assistant"
-      >
-        {open ? <X size={btnPx < 56 ? 18 : 22} style={{ pointerEvents: 'none' }}/> : <MessageCircle size={btnPx < 56 ? 18 : 22} style={{ pointerEvents: 'none' }}/>}
-        {!open && unread > 0 && (
-          <span style={{
-            position: 'absolute', top: '-4px', right: '-4px',
-            width: '20px', height: '20px', borderRadius: '50%',
-            background: '#ef4444', color: '#fff',
-            fontSize: '10px', fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            pointerEvents: 'none',
-          }}>{unread}</span>
-        )}
-      </button>
+      <>
+        {/* ── Floating button (draggable) */}
+        <button
+            ref={btnRef}
+            type="button"
+            onClick={handleBtnClick}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={() => { dragRef.current.active = false; }}
+            className="rounded-full flex items-center justify-center shadow-2xl"
+            style={{
+              position: 'fixed',
+              left: pos.x,
+              top: pos.y,
+              width: btnPx,
+              height: btnPx,
+              background: 'var(--accent)', color: '#070d1a',
+              zIndex: 9999, border: 'none',
+              cursor: window.innerWidth < 768 ? 'grab' : 'pointer',
+              touchAction: 'none',
+              userSelect: 'none',
+            }}
+            aria-label="Open SkinSight Assistant"
+        >
+          {open ? <X size={btnPx < 56 ? 18 : 22} style={{ pointerEvents: 'none' }}/> : <MessageCircle size={btnPx < 56 ? 18 : 22} style={{ pointerEvents: 'none' }}/>}
+          {!open && unread > 0 && (
+              <span style={{
+                position: 'absolute', top: '-4px', right: '-4px',
+                width: '20px', height: '20px', borderRadius: '50%',
+                background: '#ef4444', color: '#fff',
+                fontSize: '10px', fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                pointerEvents: 'none',
+              }}>{unread}</span>
+          )}
+        </button>
 
-      {/* ── Chat panel */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.95 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-col rounded-2xl overflow-hidden shadow-2xl"
-            style={getPanelStyle()}
-          >
-            {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-                 style={{ background: 'var(--accent)', color: '#070d1a' }}>
-              <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
-                   style={{ background: '#cce9f3', border: '1.5px solid rgba(7,13,26,0.2)' }}>
-                <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold leading-none" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  <span style={{ fontWeight: 900, fontSize: '1.1em' }}>S</span>kinSight Assistant
-                </p>
-                <p className="text-[10px] opacity-60 mt-0.5" style={{ fontFamily: "'Inter', sans-serif" }}>
-                  AI-powered · skin health and app help
-                </p>
-              </div>
-              <button type="button" onClick={() => setOpen(false)}
-                      className="opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                      style={{ border: 'none', background: 'transparent', color: 'inherit' }}>
-                <X size={18}/>
-              </button>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" style={{ overscrollBehavior: 'contain' }}>
-              {messages.map((msg, i) => {
-                if (i === 0 && msg.content === WELCOME_MARKER) {
-                  return (
-                    <motion.div key={0} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                      <WelcomeCard />
-                    </motion.div>
-                  );
-                }
-                return (
-                  <motion.div key={i}
-                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-                  >
-                    <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5 overflow-hidden"
-                         style={{ background: msg.role === 'user' ? 'var(--accent-dim)' : '#cce9f3', color: 'var(--accent)' }}>
-                      {msg.role === 'user'
-                        ? <User size={13}/>
-                        : <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
-                      }
-                    </div>
-                    <div className="max-w-[84%]"
-                         style={{
-                           background: msg.role === 'user' ? 'var(--accent)' : 'var(--surface2)',
-                           color: msg.role === 'user' ? '#070d1a' : 'var(--tx)',
-                           borderRadius: msg.role === 'user' ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
-                           padding: msg.role === 'user' ? '8px 13px' : '11px 13px',
-                           border: msg.role === 'assistant' ? '1px solid var(--br)' : 'none',
-                           fontSize: '0.83rem',
-                           lineHeight: 1.55,
-                           fontFamily: "'Inter', sans-serif",
-                         }}>
-                      {msg.role === 'user'
-                        ? msg.content
-                        : renderMarkdown(msg.content)
-                      }
-                    </div>
-                  </motion.div>
-                );
-              })}
-
-              {loading && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
-                  <LogoAvatar />
-                  <div className="px-3 py-2 rounded-2xl flex items-center gap-2"
-                       style={{ background: 'var(--surface2)', borderRadius: '4px 18px 18px 18px', border: '1px solid var(--br)' }}>
-                    <Loader2 size={14} className="animate-spin" style={{ color: 'var(--accent)' }}/>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--tx3)', fontFamily: "'Inter', sans-serif" }}>Thinking…</span>
+        {/* ── Chat panel */}
+        <AnimatePresence>
+          {open && (
+              <motion.div
+                  initial={{ opacity: 0, y: 24, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 24, scale: 0.95 }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-col rounded-2xl overflow-hidden shadow-2xl"
+                  style={getPanelStyle()}
+              >
+                {/* Header */}
+                <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
+                     style={{ background: 'var(--accent)', color: '#070d1a' }}>
+                  <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
+                       style={{ background: '#cce9f3', border: '1.5px solid rgba(7,13,26,0.2)' }}>
+                    <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
                   </div>
-                </motion.div>
-              )}
-
-              {error && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
-                  style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.22)' }}>
-                  <AlertCircle size={13} style={{ flexShrink: 0, marginTop: '2px' }}/>
-                  <span style={{ fontSize: '0.78rem', lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>{error}</span>
-                </motion.div>
-              )}
-              <div ref={bottomRef}/>
-            </div>
-
-            {/* Suggested questions */}
-            {messages.length === 1 && !loading && (
-              <div className="px-3 pb-2 flex flex-wrap gap-1.5 flex-shrink-0">
-                {SUGGESTED.map(s => (
-                  <button key={s} type="button" onClick={() => send(s)}
-                    className="px-2 py-0.5 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80"
-                    style={{
-                      fontSize: 'clamp(0.62rem, 3.2vw, 0.72rem)', fontFamily: "'Inter', sans-serif",
-                      background: 'var(--accent-dim)', color: 'var(--accent)',
-                      border: '1px solid rgba(0,229,255,0.22)',
-                    }}>
-                    {s}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold leading-none" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      <span style={{ fontWeight: 900, fontSize: '1.1em' }}>S</span>kinSight Assistant
+                    </p>
+                    <p className="text-[10px] opacity-60 mt-0.5" style={{ fontFamily: "'Inter', sans-serif" }}>
+                      AI-powered · skin health and app help
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setOpen(false)}
+                          className="opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                          style={{ border: 'none', background: 'transparent', color: 'inherit' }}>
+                    <X size={18}/>
                   </button>
-                ))}
-              </div>
-            )}
+                </div>
 
-            {/* Input */}
-            <div className="px-3 pb-3 pt-2 flex-shrink-0" style={{ borderTop: '1px solid var(--br)' }}>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                   style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
-                <input
-                  ref={inputRef}
-                  value={input}
-                  onChange={e => setInput(e.target.value.slice(0, MAX_CHARS))}
-                  onKeyDown={handleKey}
-                  placeholder="Ask about skin conditions or the app…"
-                  disabled={loading}
-                  className="flex-1 bg-transparent outline-none"
-                  style={{ fontSize: '0.84rem', color: 'var(--tx)', fontFamily: "'Inter', sans-serif" }}
-                />
-                {showCounter && (
-                  <span style={{
-                    fontSize: '0.65rem', flexShrink: 0, fontFamily: "'Inter', sans-serif",
-                    color: charsLeft <= 20 ? '#ef4444' : charsLeft <= 60 ? '#f59e0b' : 'var(--tx3)',
-                  }}>
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" style={{ overscrollBehavior: 'contain' }}>
+                  {messages.map((msg, i) => {
+                    if (i === 0 && msg.content === WELCOME_MARKER) {
+                      return (
+                          <motion.div key={0} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                            <WelcomeCard />
+                          </motion.div>
+                      );
+                    }
+                    return (
+                        <motion.div key={i}
+                                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+                        >
+                          <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5 overflow-hidden"
+                               style={{ background: msg.role === 'user' ? 'var(--accent-dim)' : '#cce9f3', color: 'var(--accent)' }}>
+                            {msg.role === 'user'
+                                ? <User size={13}/>
+                                : <img src="/sign.png" alt="SkinSight" style={{ width: '100%', height: '100%', objectFit: 'contain' }}/>
+                            }
+                          </div>
+                          <div className="max-w-[84%]"
+                               style={{
+                                 background: msg.role === 'user' ? 'var(--accent)' : 'var(--surface2)',
+                                 color: msg.role === 'user' ? '#070d1a' : 'var(--tx)',
+                                 borderRadius: msg.role === 'user' ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
+                                 padding: msg.role === 'user' ? '8px 13px' : '11px 13px',
+                                 border: msg.role === 'assistant' ? '1px solid var(--br)' : 'none',
+                                 fontSize: '0.83rem',
+                                 lineHeight: 1.55,
+                                 fontFamily: "'Inter', sans-serif",
+                               }}>
+                            {msg.role === 'user'
+                                ? msg.content
+                                : renderMarkdown(msg.content)
+                            }
+                          </div>
+                        </motion.div>
+                    );
+                  })}
+
+                  {loading && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
+                        <LogoAvatar />
+                        <div className="px-3 py-2 rounded-2xl flex items-center gap-2"
+                             style={{ background: 'var(--surface2)', borderRadius: '4px 18px 18px 18px', border: '1px solid var(--br)' }}>
+                          <Loader2 size={14} className="animate-spin" style={{ color: 'var(--accent)' }}/>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--tx3)', fontFamily: "'Inter', sans-serif" }}>Thinking…</span>
+                        </div>
+                      </motion.div>
+                  )}
+
+                  {error && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
+                                  style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.22)' }}>
+                        <AlertCircle size={13} style={{ flexShrink: 0, marginTop: '2px' }}/>
+                        <span style={{ fontSize: '0.78rem', lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>{error}</span>
+                      </motion.div>
+                  )}
+                  <div ref={bottomRef}/>
+                </div>
+
+                {/* Suggested questions */}
+                {messages.length === 1 && !loading && (
+                    <div className="px-3 pb-2 flex flex-wrap gap-1.5 flex-shrink-0">
+                      {SUGGESTED.map(s => (
+                          <button key={s} type="button" onClick={() => send(s)}
+                                  className="px-2 py-0.5 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80"
+                                  style={{
+                                    fontSize: 'clamp(0.62rem, 3.2vw, 0.72rem)', fontFamily: "'Inter', sans-serif",
+                                    background: 'var(--accent-dim)', color: 'var(--accent)',
+                                    border: '1px solid rgba(0,229,255,0.22)',
+                                  }}>
+                            {s}
+                          </button>
+                      ))}
+                    </div>
+                )}
+
+                {/* Input */}
+                <div className="px-3 pb-3 pt-2 flex-shrink-0" style={{ borderTop: '1px solid var(--br)' }}>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                       style={{ background: 'var(--surface2)', border: '1px solid var(--br)' }}>
+                    <input
+                        ref={inputRef}
+                        value={input}
+                        onChange={e => setInput(e.target.value.slice(0, MAX_CHARS))}
+                        onKeyDown={handleKey}
+                        placeholder="Ask about skin conditions or the app…"
+                        disabled={loading}
+                        className="flex-1 bg-transparent outline-none"
+                        style={{ fontSize: '0.84rem', color: 'var(--tx)', fontFamily: "'Inter', sans-serif" }}
+                    />
+                    {showCounter && (
+                        <span style={{
+                          fontSize: '0.65rem', flexShrink: 0, fontFamily: "'Inter', sans-serif",
+                          color: charsLeft <= 20 ? '#ef4444' : charsLeft <= 60 ? '#f59e0b' : 'var(--tx3)',
+                        }}>
                     {charsLeft}
                   </span>
-                )}
-                <button type="button" onClick={() => send(input)} disabled={!input.trim() || loading}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-40 cursor-pointer"
-                  style={{
-                    background: input.trim() && !loading ? 'var(--accent)' : 'var(--br)',
-                    color:      input.trim() && !loading ? '#070d1a'       : 'var(--tx3)',
-                    border: 'none',
-                  }}>
-                  <Send size={12}/>
-                </button>
-              </div>
-              <p className="text-center mt-1.5"
-                 style={{ fontSize: '0.68rem', color: 'var(--tx3)', fontFamily: "'Inter', sans-serif" }}>
-                Not a substitute for professional medical advice
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+                    )}
+                    <button type="button" onClick={() => send(input)} disabled={!input.trim() || loading}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-40 cursor-pointer"
+                            style={{
+                              background: input.trim() && !loading ? 'var(--accent)' : 'var(--br)',
+                              color:      input.trim() && !loading ? '#070d1a'       : 'var(--tx3)',
+                              border: 'none',
+                            }}>
+                      <Send size={12}/>
+                    </button>
+                  </div>
+                  <p className="text-center mt-1.5"
+                     style={{ fontSize: '0.68rem', color: 'var(--tx3)', fontFamily: "'Inter', sans-serif" }}>
+                    Not a substitute for professional medical advice
+                  </p>
+                </div>
+              </motion.div>
+          )}
+        </AnimatePresence>
+      </>
   );
 };
